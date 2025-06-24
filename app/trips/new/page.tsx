@@ -83,19 +83,8 @@ export default function NewTripPage() {
 
       console.log("✅ Trip created successfully:", data.id)
 
-      // Add the user as owner in trip_members
-      const { error: memberError } = await supabase.from("trip_members").insert({
-        trip_id: data.id,
-        user_id: user.id,
-        role: "owner",
-        status: "accepted",
-        joined_at: new Date().toISOString(),
-      })
-
-      if (memberError) {
-        console.error("❌ Member creation error:", memberError)
-        // Don't fail the whole process for this
-      }
+      // Note: The user is automatically added as owner via database trigger
+      // No need to manually insert into trip_members
 
       router.push(`/trips/${data.id}`)
     } catch (error: unknown) {

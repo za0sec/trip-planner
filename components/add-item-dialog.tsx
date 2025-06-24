@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
-import { CalendarIcon, PlaneTakeoff, Hotel, Car, Utensils, Camera, ShoppingBag, MoreHorizontal } from "lucide-react"
+import { CalendarIcon, PlaneTakeoff, Hotel, Car, Utensils, Camera, ShoppingBag, MoreHorizontal, Upload, X } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
@@ -49,6 +49,9 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
   const [date, setDate] = useState<Date | undefined>(undefined)
   const [location, setLocation] = useState("")
   const [estimatedCost, setEstimatedCost] = useState("")
+  const [image, setImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -61,10 +64,64 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
       setDate(undefined)
       setLocation("")
       setEstimatedCost("")
+      setImage(null)
+      setImagePreview(null)
       setError(null)
       setLoading(false)
     }
   }, [open])
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        setError("La imagen debe ser menor a 5MB")
+        return
+      }
+      
+      setImage(file)
+      const reader = new FileReader()
+      reader.onload = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removeImage = () => {
+    setImage(null)
+    setImagePreview(null)
+  }
+
+  const uploadImage = async (activityId: string): Promise<string | null> => {
+    if (!image || !user) return null
+
+    setUploadingImage(true)
+    try {
+      const fileExt = image.name.split('.').pop()
+      const fileName = `${user.id}/${activityId}-${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('trip-items')
+        .upload(fileName, image)
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError)
+        return null
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('trip-items')
+        .getPublicUrl(fileName)
+
+      return publicUrl
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      return null
+    } finally {
+      setUploadingImage(false)
+    }
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -76,7 +133,8 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
     setError(null)
 
     try {
-      const { error: insertError } = await supabase.from("activities").insert({
+      // First create the activity
+      const { data: activityData, error: insertError } = await supabase.from("activities").insert({
         trip_id: tripId,
         title,
         description,
@@ -85,10 +143,28 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
         location,
         estimated_cost: estimatedCost ? Number.parseFloat(estimatedCost) : null,
         created_by: user?.id,
-      })
+      }).select().single()
 
       if (insertError) {
         throw insertError
+      }
+
+      // Upload image if provided
+      let imageUrl = null
+      if (image && activityData) {
+        imageUrl = await uploadImage(activityData.id)
+        
+        // Update activity with image URL
+        if (imageUrl) {
+          const { error: updateError } = await supabase
+            .from("activities")
+            .update({ image_url: imageUrl })
+            .eq("id", activityData.id)
+
+          if (updateError) {
+            console.error("Error updating activity with image:", updateError)
+          }
+        }
       }
 
       onItemAdded()
@@ -209,14 +285,58 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
             </div>
           </div>
 
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="image" className="text-right pt-2">
+              Imagen
+            </Label>
+            <div className="col-span-3 space-y-3">
+              {!imagePreview ? (
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center">
+                  <input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="image"
+                    className="cursor-pointer flex flex-col items-center gap-2 text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    <Upload className="h-8 w-8" />
+                    <span>Subir imagen</span>
+                    <span className="text-xs text-gray-400">PNG, JPG hasta 5MB</span>
+                  </label>
+                </div>
+              ) : (
+                <div className="relative">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-32 object-cover rounded-lg"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {error && <p className="text-red-500 text-sm col-span-4 text-center">{error}</p>}
         </form>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button type="submit" form="addItemForm" onClick={handleSubmit} disabled={loading}>
-            {loading ? "Agregando..." : "Agregar Actividad"}
+          <Button type="submit" form="addItemForm" onClick={handleSubmit} disabled={loading || uploadingImage}>
+            {loading ? "Agregando..." : uploadingImage ? "Subiendo imagen..." : "Agregar Actividad"}
           </Button>
         </DialogFooter>
       </DialogContent>

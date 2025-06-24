@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Upload, X } from "lucide-react"
 
 interface AddExpenseDialogProps {
   open: boolean
@@ -38,6 +39,9 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
+  const [image, setImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -52,6 +56,19 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
   useEffect(() => {
     if (open) {
       fetchCategories()
+      // Reset form and image when dialog opens
+      setImage(null)
+      setImagePreview(null)
+      setFormData({
+        title: "",
+        description: "",
+        category_id: "",
+        amount: "",
+        purchase_date: "",
+        location: "",
+        status: "planned",
+        notes: "",
+      })
     }
   }, [open])
 
@@ -66,6 +83,58 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
       }
     } catch (error) {
       console.error("Error fetching categories:", error)
+    }
+  }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert("La imagen debe ser menor a 5MB")
+        return
+      }
+      
+      setImage(file)
+      const reader = new FileReader()
+      reader.onload = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removeImage = () => {
+    setImage(null)
+    setImagePreview(null)
+  }
+
+  const uploadImage = async (expenseId: string): Promise<string | null> => {
+    if (!image || !user) return null
+
+    setUploadingImage(true)
+    try {
+      const fileExt = image.name.split('.').pop()
+      const fileName = `${user.id}/${expenseId}-${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('trip-items')
+        .upload(fileName, image)
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError)
+        return null
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('trip-items')
+        .getPublicUrl(fileName)
+
+      return publicUrl
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      return null
+    } finally {
+      setUploadingImage(false)
     }
   }
 
@@ -87,7 +156,8 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
         return
       }
 
-      const { error } = await supabase.from("trip_expenses").insert({
+      // First create the expense
+      const { data: expenseData, error } = await supabase.from("trip_expenses").insert({
         trip_id: tripId,
         category_id: formData.category_id || null,
         title: formData.title,
@@ -99,7 +169,7 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
         status: formData.status,
         notes: formData.notes || null,
         created_by: user.id,
-      })
+      }).select().single()
 
       if (error) {
         console.error("Error adding expense:", error)
@@ -107,7 +177,24 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
         return
       }
 
-      // Reset form
+      // Upload image if provided
+      if (image && expenseData) {
+        const imageUrl = await uploadImage(expenseData.id)
+        
+        // Update expense with image URL
+        if (imageUrl) {
+          const { error: updateError } = await supabase
+            .from("trip_expenses")
+            .update({ image_url: imageUrl })
+            .eq("id", expenseData.id)
+
+          if (updateError) {
+            console.error("Error updating expense with image:", updateError)
+          }
+        }
+      }
+
+      // Reset form and image
       setFormData({
         title: "",
         description: "",
@@ -118,6 +205,8 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
         status: "planned",
         notes: "",
       })
+      setImage(null)
+      setImagePreview(null)
 
       onExpenseAdded()
       onOpenChange(false)
@@ -250,6 +339,46 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="expense-image">Imagen / Recibo</Label>
+            {!imagePreview ? (
+              <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center">
+                <input
+                  id="expense-image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="expense-image"
+                  className="cursor-pointer flex flex-col items-center gap-2 text-sm text-gray-600 hover:text-gray-800"
+                >
+                  <Upload className="h-8 w-8" />
+                  <span>Subir imagen o recibo</span>
+                  <span className="text-xs text-gray-400">PNG, JPG hasta 5MB</span>
+                </label>
+              </div>
+            ) : (
+              <div className="relative">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-full h-32 object-cover rounded-lg"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+
           <div className="bg-green-50 p-4 rounded-lg">
             <h3 className="font-semibold text-green-900 mb-2">💡 Ejemplos de gastos generales</h3>
             <ul className="text-sm text-green-800 space-y-1">
@@ -266,8 +395,8 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !formData.title || !formData.amount} className="flex-1">
-              {loading ? "Agregando..." : "Agregar Gasto"}
+            <Button type="submit" disabled={loading || uploadingImage || !formData.title || !formData.amount} className="flex-1">
+              {loading ? "Agregando..." : uploadingImage ? "Subiendo imagen..." : "Agregar Gasto"}
             </Button>
           </div>
         </form>
