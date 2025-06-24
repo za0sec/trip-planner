@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 import {
   PlusCircle,
   MapPin,
@@ -315,11 +316,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50" data-tutorial="welcome">
-      <Navbar />
-      <TutorialSystem type="dashboard" autoStart={true} />
+          <div className="min-h-screen bg-gray-50 flex flex-col" data-tutorial="welcome">
+        <Navbar />
+        <TutorialSystem type="dashboard" autoStart={true} />
 
-      <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
@@ -622,6 +623,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+        <Footer />
       </div>
     </div>
   )

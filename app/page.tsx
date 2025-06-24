@@ -3,6 +3,7 @@
 
 import { useAuth } from "@/components/auth-provider"
 import { AuthForm } from "@/components/auth-form"
+import { Footer } from "@/components/footer"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { useSearchParams } from "next/navigation"
@@ -50,7 +51,7 @@ export default function HomePage() {
 
   // Show auth form for non-authenticated users
   return (
-    <div>
+    <div className="min-h-screen flex flex-col">
       {message === "email_confirmed" && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
           <Alert className="border-green-200 bg-green-50">
@@ -75,7 +76,10 @@ export default function HomePage() {
         </div>
       )}
 
-      <AuthForm />
+      <div className="flex-1">
+        <AuthForm />
+      </div>
+      <Footer />
     </div>
   )
 }

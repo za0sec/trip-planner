@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 import { TripAIRecommendations } from "@/components/trip-ai-recommendations"
 import { TutorialSystem } from "@/components/tutorial-system"
 import {
@@ -91,36 +92,38 @@ export default function AIRecommendationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
         <Navbar />
-        <div className="flex items-center justify-center py-20">
+        <div className="flex items-center justify-center py-20 flex-1">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
+        <Footer />
       </div>
     )
   }
 
   if (!trip || !canView()) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
         <Navbar />
-        <div className="text-center py-20">
+        <div className="text-center py-20 flex-1">
           <h1 className="text-2xl font-bold mb-4">Acceso Denegado</h1>
           <p className="text-gray-600 mb-6">No tienes permisos para ver este viaje.</p>
           <Link href="/trips">
             <Button>Volver a Mis Viajes</Button>
           </Link>
         </div>
+        <Footer />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       <Navbar />
       <TutorialSystem type="ai" autoStart={true} />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
         {/* Breadcrumbs y navegación */}
         <div className="mb-6">
           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -190,6 +193,7 @@ export default function AIRecommendationsPage() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   )
 } 

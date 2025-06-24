@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TripExpenses } from "@/components/trip-expenses"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -362,10 +363,10 @@ export default function TripDetailPage() {
     new Date() <= new Date(trip.end_date)
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col">
       <Navbar />
       <TutorialSystem type="trip_management" autoStart={true} />
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/trips">
             <Button
@@ -1069,6 +1070,7 @@ export default function TripDetailPage() {
           onItemAdded={fetchTripData}
         />
       )}
+      <Footer />
     </div>
   )
 }

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 import { TutorialSystem } from "@/components/tutorial-system"
 import { ArrowLeft, MapPin, Calendar } from "lucide-react"
 import Link from "next/link"
@@ -104,11 +105,11 @@ export default function NewTripPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
       <TutorialSystem type="create_trip" autoStart={true} />
 
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-4 py-8 max-w-2xl flex-1">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/trips">
             <Button variant="outline" size="sm">
@@ -227,6 +228,7 @@ export default function NewTripPage() {
           </CardContent>
         </Card>
       </div>
+      <Footer />
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
 import { useState } from "react"
 import { redirect } from "next/navigation"
 import { RefreshCw, HelpCircle } from "lucide-react"
@@ -30,6 +31,7 @@ export default function ProfilePage() {
           trip_management_tutorial_completed: false,
           ai_tutorial_completed: false,
           collaboration_tutorial_completed: false,
+          summary_tutorial_completed: false,
         })
         .eq("id", user.id)
 
@@ -69,18 +71,20 @@ export default function ProfilePage() {
       create_trip: "Creación de Viaje",
       trip_management: "Gestión de Viaje",
       ai: "Recomendaciones IA",
-      collaboration: "Colaboración"
+      collaboration: "Colaboración",
+      summary: "Resumen"
     }
     return names[type as keyof typeof names] || type
   }
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <Navbar />
-        <div className="flex flex-col items-center justify-center py-20">
+        <div className="flex flex-col items-center justify-center py-20 flex-1">
           <p>Cargando...</p>
         </div>
+        <Footer />
       </div>
     )
   }
@@ -91,9 +95,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-8 max-w-4xl flex-1">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Profile Form */}
           <div>
@@ -128,6 +132,7 @@ export default function ProfilePage() {
                       { key: "trip_management", name: "Gestión de Viaje" },
                       { key: "ai", name: "Recomendaciones IA" },
                       { key: "collaboration", name: "Colaboración" },
+                      { key: "summary", name: "Resumen" },
                     ].map((tutorial) => (
                       <div key={tutorial.key} className="flex items-center justify-between p-2 border rounded">
                         <span className="text-sm">{tutorial.name}</span>
@@ -164,6 +169,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   )
 }
