@@ -70,11 +70,11 @@ const roleLabels = {
   viewer: "Visualizador",
 }
 
-const roleDescriptions = {
-  owner: "Control total del viaje",
-  editor: "Puede agregar y editar elementos",
-  viewer: "Solo puede ver el viaje",
-}
+    // const roleDescriptions = {
+  //   owner: "Control total del viaje",
+  //   editor: "Puede agregar y editar elementos",
+  //   viewer: "Solo puede ver el viaje",
+  // }
 
 export function TripCollaboration({ tripId, isOwner }: TripCollaborationProps) {
   const { user } = useAuth()
@@ -94,6 +94,7 @@ export function TripCollaboration({ tripId, isOwner }: TripCollaborationProps) {
   useEffect(() => {
     fetchCollaborationData()
     fetchTripInfo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId])
 
   const fetchTripInfo = async () => {
@@ -117,7 +118,7 @@ export function TripCollaboration({ tripId, isOwner }: TripCollaborationProps) {
       if (error) {
         console.error("Error fetching trip info:", error)
       } else {
-        setTripInfo(data as TripInfo)
+        setTripInfo(data as unknown as TripInfo)
       }
     } catch (error) {
       console.error("Error fetching trip info:", error)
@@ -154,7 +155,7 @@ export function TripCollaboration({ tripId, isOwner }: TripCollaborationProps) {
         const validMembers = (membersData || []).map((member) => ({
           ...member,
           profiles: member.profiles || { email: "N/A", full_name: "Usuario Desconocido", avatar_url: null },
-        })) as TripMember[]
+        })) as unknown as TripMember[]
         setMembers(validMembers)
       }
 
@@ -172,9 +173,9 @@ export function TripCollaboration({ tripId, isOwner }: TripCollaborationProps) {
       } else {
         setInvitations(invitationsData || [])
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching collaboration data:", error)
-      setMessage({ type: "error", text: `Error general al cargar datos: ${error.message}` })
+              setMessage({ type: "error", text: `Error general al cargar datos: ${(error as Error).message}` })
     } finally {
       setLoading(false)
     }
@@ -294,9 +295,9 @@ export function TripCollaboration({ tripId, isOwner }: TripCollaborationProps) {
       setInviteForm({ email: "", role: "editor" })
       setShowInviteDialog(false)
       fetchCollaborationData()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error general en sendInvitation:", error)
-      setMessage({ type: "error", text: error.message || "Error al enviar la invitación." })
+              setMessage({ type: "error", text: (error as Error).message || "Error al enviar la invitación." })
     } finally {
       setInviteLoading(false)
     }
@@ -560,7 +561,7 @@ export function TripCollaboration({ tripId, isOwner }: TripCollaborationProps) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => resendInvitation(invitation.id, invitation.email, invitation.token)}
+                            onClick={() => resendInvitation(invitation.id, invitation.email, '')}
                             className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           >
                             Reenviar

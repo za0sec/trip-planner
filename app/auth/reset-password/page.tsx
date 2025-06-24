@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Image from "next/image"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -65,7 +66,7 @@ export default function ResetPasswordPage() {
       setTimeout(() => {
         router.push("/dashboard")
       }, 2000)
-    } catch (error: any) {
+            } catch {
       setMessage({
         type: "error",
         text: "Error al actualizar la contraseña. Intenta de nuevo.",
@@ -80,10 +81,13 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-md">
         <Card>
           <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center gap-2">
-              <Lock className="h-5 w-5" />
-              Restablecer Contraseña
-            </CardTitle>
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <Image src="/images/logo.png" alt="Trip Planner" width={24} height={24} className="h-6 w-6" />
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Restablecer Contraseña
+              </CardTitle>
+            </div>
             <CardDescription>Ingresa tu nueva contraseña</CardDescription>
           </CardHeader>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -82,22 +82,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [joiningInvitation, setJoiningInvitation] = useState<string | null>(null)
 
-  useEffect(() => {
-    // Redirect to home if not authenticated and not loading
-    if (!authLoading && !user) {
-      console.log("📍 No user found, redirecting to home")
-      router.push("/")
-      return
-    }
-
-    // Fetch trips if user is authenticated
-    if (!authLoading && user) {
-      console.log("📊 Fetching dashboard data for:", user.email)
-      fetchDashboardData()
-    }
-  }, [user, authLoading, router])
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!user) return
 
     try {
@@ -133,16 +118,16 @@ export default function DashboardPage() {
         console.error("❌ Error fetching trips:", tripsError)
         setTrips([])
       } else {
-        const formattedTrips =
-          (memberData
+        const formattedTrips: Trip[] =
+          memberData
             ?.map((member) => {
               if (!member.trips) return null // Should not happen with an inner join equivalent
               return {
                 ...member.trips, // Spread all properties of the trip object
                 trip_members: [{ role: member.role, status: member.status }], // Add member info
-              }
+              } as unknown as Trip
             })
-            .filter((trip) => trip !== null) as Trip[]) || [] // Filter out any nulls and cast
+            .filter((trip): trip is Trip => trip !== null) || [] // Filter out any nulls with type guard
 
         console.log("✅ Trips fetched:", formattedTrips.length || 0, formattedTrips)
         setTrips(formattedTrips)
@@ -191,7 +176,7 @@ export default function DashboardPage() {
         setPendingInvitations([])
       } else {
         console.log("✅ Member invitations fetched:", memberInvitations?.length || 0, memberInvitations)
-        setPendingInvitations(memberInvitations || [])
+        setPendingInvitations((memberInvitations || []) as unknown as PendingInvitation[])
       }
     } catch (error) {
       console.error("❌ Error in fetchDashboardData:", error)
@@ -200,7 +185,22 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    // Redirect to home if not authenticated and not loading
+    if (!authLoading && !user) {
+      console.log("📍 No user found, redirecting to home")
+      router.push("/")
+      return
+    }
+
+    // Fetch trips if user is authenticated
+    if (!authLoading && user) {
+      console.log("📊 Fetching dashboard data for:", user.email)
+      fetchDashboardData()
+    }
+  }, [user, authLoading, router, fetchDashboardData])
 
   const joinTrip = async (invitationId: string, tripId: string) => {
     if (!user) return

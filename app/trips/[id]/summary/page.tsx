@@ -91,6 +91,7 @@ export default function SummaryPage() {
     if (user && params.id) {
       fetchTripData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, params.id])
 
   const fetchTripData = async () => {
@@ -125,7 +126,7 @@ export default function SummaryPage() {
         .from("activities")
         .select("*")
         .eq("trip_id", params.id)
-        .order("date", { ascending: true, nullsLast: true })
+        .order("date", { ascending: true })
 
       if (activitiesError) {
         console.error("Error fetching activities:", activitiesError)

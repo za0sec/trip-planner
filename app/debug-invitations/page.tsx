@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,16 +9,10 @@ import { Navbar } from "@/components/navbar"
 
 export default function DebugInvitationsPage() {
   const { user } = useAuth()
-  const [debugData, setDebugData] = useState<any>({})
+  const [debugData, setDebugData] = useState<Record<string, unknown>>({})
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (user) {
-      fetchDebugData()
-    }
-  }, [user])
-
-  const fetchDebugData = async () => {
+  const fetchDebugData = useCallback(async () => {
     if (!user) return
 
     try {
@@ -83,7 +77,13 @@ export default function DebugInvitationsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (user) {
+      fetchDebugData()
+    }
+  }, [user, fetchDebugData])
 
   const createTestInvitation = async () => {
     if (!user) return
@@ -108,7 +108,7 @@ export default function DebugInvitationsPage() {
       }
 
       // Now create a test invitation for the same user (self-invitation for testing)
-      const { data: invitation, error: invitationError } = await supabase
+      const { error: invitationError } = await supabase
         .from("trip_members")
         .insert({
           trip_id: trip.id,
@@ -162,7 +162,7 @@ export default function DebugInvitationsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Todos los Trip Members ({debugData.allMembers?.length || 0})</CardTitle>
+                <CardTitle>Todos los Trip Members ({(debugData.allMembers as unknown[])?.length || 0})</CardTitle>
               </CardHeader>
               <CardContent>
                 <pre className="bg-gray-100 p-4 rounded text-sm overflow-auto">
@@ -173,7 +173,7 @@ export default function DebugInvitationsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Invitaciones Pendientes ({debugData.pendingInvitations?.length || 0})</CardTitle>
+                <CardTitle>Invitaciones Pendientes ({(debugData.pendingInvitations as unknown[])?.length || 0})</CardTitle>
               </CardHeader>
               <CardContent>
                 <pre className="bg-gray-100 p-4 rounded text-sm overflow-auto">
@@ -184,7 +184,7 @@ export default function DebugInvitationsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Todos los Viajes ({debugData.allTrips?.length || 0})</CardTitle>
+                <CardTitle>Todos los Viajes ({(debugData.allTrips as unknown[])?.length || 0})</CardTitle>
               </CardHeader>
               <CardContent>
                 <pre className="bg-gray-100 p-4 rounded text-sm overflow-auto">
@@ -195,7 +195,7 @@ export default function DebugInvitationsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Perfiles ({debugData.profiles?.length || 0})</CardTitle>
+                <CardTitle>Perfiles ({(debugData.profiles as unknown[])?.length || 0})</CardTitle>
               </CardHeader>
               <CardContent>
                 <pre className="bg-gray-100 p-4 rounded text-sm overflow-auto">

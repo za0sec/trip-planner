@@ -9,12 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navbar } from "@/components/navbar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TripCollaboration } from "@/components/trip-collaboration"
 import { TripExpenses } from "@/components/trip-expenses"
-import { TripSummary } from "@/components/trip-summary"
-import { TripAIRecommendations } from "@/components/trip-ai-recommendations"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   ArrowLeft,
   MapPin,
@@ -200,6 +196,7 @@ export default function TripDetailPage() {
     if (user && params.id) {
       fetchTripData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, params.id])
 
   const fetchTripData = async () => {
@@ -236,8 +233,8 @@ export default function TripDetailPage() {
         .from("activities")
         .select("*")
         .eq("trip_id", tripId)
-        .order("date", { ascending: true, nullsLast: true })
-        .order("start_time", { ascending: true, nullsLast: true })
+        .order("date", { ascending: true })
+        .order("start_time", { ascending: true })
       setActivities(activitiesData || [])
 
       const { data: expensesData } = await supabase.rpc("get_trip_expenses", { trip_uuid: tripId, user_uuid: userId })

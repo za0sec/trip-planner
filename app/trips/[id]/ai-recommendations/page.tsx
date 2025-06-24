@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabase"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navbar } from "@/components/navbar"
@@ -48,13 +48,7 @@ export default function AIRecommendationsPage() {
   const canEdit = () => isOwner() || (userRole?.role === "editor" && userRole?.status === "accepted")
   const canView = () => isOwner() || userRole?.status === "accepted"
 
-  useEffect(() => {
-    if (user && params.id) {
-      fetchTripData()
-    }
-  }, [user, params.id])
-
-  const fetchTripData = async () => {
+  const fetchTripData = useCallback(async () => {
     try {
       // Fetch trip data
       const { data: tripData, error: tripError } = await supabase
@@ -86,7 +80,13 @@ export default function AIRecommendationsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, user?.id, router])
+
+  useEffect(() => {
+    if (user && params.id) {
+      fetchTripData()
+    }
+  }, [user, params.id, fetchTripData])
 
   if (loading) {
     return (

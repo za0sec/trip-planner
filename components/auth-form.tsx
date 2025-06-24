@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -43,11 +44,11 @@ export function AuthForm() {
       await signIn(signInData.email, signInData.password)
       setMessage({ type: "success", text: "¡Bienvenido de vuelta!" })
       // The auth provider will handle the redirect
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: "error",
         text:
-          error.message === "Invalid login credentials"
+          (error as Error).message === "Invalid login credentials"
             ? "Email o contraseña incorrectos"
             : "Error al iniciar sesión. Intenta de nuevo.",
       })
@@ -82,10 +83,10 @@ export function AuthForm() {
       setSignUpData({ email: "", password: "", confirmPassword: "", fullName: "" })
       // Switch to sign in tab after successful registration
       setTimeout(() => setActiveTab("signin"), 3000)
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: "error",
-        text: error.message.includes("already registered")
+        text: (error as Error).message.includes("already registered")
           ? "Este email ya está registrado"
           : "Error al crear la cuenta. Intenta de nuevo.",
       })
@@ -106,7 +107,7 @@ export function AuthForm() {
         text: "Te hemos enviado un email para restablecer tu contraseña. Revisa tu bandeja de entrada.",
       })
       setResetEmail("")
-    } catch (error: any) {
+    } catch {
       setMessage({ type: "error", text: "Error al enviar el email. Intenta de nuevo." })
     } finally {
       setLoading(false)
@@ -122,7 +123,10 @@ export function AuthForm() {
               <Plane className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">TravelPlanner</h1>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Image src="/images/logo.png" alt="Trip Planner" width={48} height={48} className="h-12 w-12" />
+            <h1 className="text-3xl font-bold text-gray-900">Trip Planner</h1>
+          </div>
           <p className="text-gray-600 mt-2">Organiza cualquier viaje, a cualquier destino</p>
         </div>
 

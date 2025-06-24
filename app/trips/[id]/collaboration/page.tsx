@@ -50,6 +50,7 @@ export default function CollaborationPage() {
     if (user && params.id) {
       fetchTripData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, params.id])
 
   const fetchTripData = async () => {

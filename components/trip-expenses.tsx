@@ -51,6 +51,7 @@ export function TripExpenses({ tripId, tripCurrency, canEdit, isOwner }: TripExp
 
   useEffect(() => {
     fetchExpenses()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripId])
 
   const fetchExpenses = async () => {

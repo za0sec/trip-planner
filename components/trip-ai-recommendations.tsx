@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,7 +27,7 @@ import {
   ExternalLink,
   Phone,
   Clock,
-  Euro,
+
   Trash2,
   Edit,
   Save,
@@ -144,11 +144,7 @@ export function TripAIRecommendations({
   const [showBulkGenerationDialog, setShowBulkGenerationDialog] = useState(false)
   const [generatingBulk, setGeneratingBulk] = useState(false)
 
-  useEffect(() => {
-    fetchLocations()
-  }, [tripId])
-
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
       const { data: locationsData, error } = await supabase
         .from('trip_locations')
@@ -199,7 +195,11 @@ export function TripAIRecommendations({
     } finally {
       setLoading(false)
     }
-  }
+  }, [tripId])
+
+  useEffect(() => {
+    fetchLocations()
+  }, [tripId, fetchLocations])
 
   const addLocation = async () => {
     if (!user || !newLocation.date || !newLocation.location) return
@@ -270,7 +270,7 @@ export function TripAIRecommendations({
   const generateRecommendations = async (location: TripLocation) => {
     if (!user) return
 
-    setGeneratingRecommendations(prev => new Set([...prev, location.id]))
+    setGeneratingRecommendations(prev => new Set(Array.from(prev).concat(location.id)))
 
     // Generate in background without blocking UI
     try {
@@ -331,7 +331,7 @@ export function TripAIRecommendations({
       // Generate date range
       const start = new Date(bulkGeneration.startDate)
       const end = new Date(bulkGeneration.endDate)
-      const dates = []
+      const dates: string[] = []
       
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         dates.push(new Date(d).toISOString().split('T')[0])

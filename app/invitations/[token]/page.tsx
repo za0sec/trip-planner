@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabase"
@@ -39,25 +39,7 @@ export default function InvitationPage() {
   const [accepting, setAccepting] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
-  useEffect(() => {
-    fetchInvitation()
-  }, [params.token])
-
-  useEffect(() => {
-    if (!authLoading && user && invitation) {
-      // Check if user email matches invitation email
-      if (user.email === invitation.email) {
-        acceptInvitation()
-      } else {
-        setMessage({
-          type: "error",
-          text: `Esta invitación es para ${invitation.email}, pero estás conectado como ${user.email}. Cierra sesión e inicia con el email correcto.`,
-        })
-      }
-    }
-  }, [user, authLoading, invitation])
-
-  const fetchInvitation = async () => {
+  const fetchInvitation = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("trip_invitations")
@@ -100,7 +82,7 @@ export default function InvitationPage() {
             text: "Esta invitación ha expirado",
           })
         } else {
-          setInvitation(data)
+          setInvitation(data as unknown as Invitation)
         }
       }
     } catch (error) {
@@ -112,9 +94,9 @@ export default function InvitationPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.token])
 
-  const acceptInvitation = async () => {
+  const acceptInvitation = useCallback(async () => {
     if (!user || !invitation) return
 
     setAccepting(true)
@@ -178,7 +160,25 @@ export default function InvitationPage() {
     } finally {
       setAccepting(false)
     }
-  }
+  }, [user, invitation, router])
+
+  useEffect(() => {
+    fetchInvitation()
+  }, [fetchInvitation])
+
+  useEffect(() => {
+    if (!authLoading && user && invitation) {
+      // Check if user email matches invitation email
+      if (user.email === invitation.email) {
+        acceptInvitation()
+      } else {
+        setMessage({
+          type: "error",
+          text: `Esta invitación es para ${invitation.email}, pero estás conectado como ${user.email}. Cierra sesión e inicia con el email correcto.`,
+        })
+      }
+    }
+  }, [user, authLoading, invitation, acceptInvitation])
 
   if (loading || authLoading) {
     return (

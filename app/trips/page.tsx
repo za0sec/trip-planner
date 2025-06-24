@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -43,13 +43,7 @@ export default function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (user) {
-      fetchTrips()
-    }
-  }, [user])
-
-  const fetchTrips = async () => {
+  const fetchTrips = useCallback(async () => {
     try {
       console.log("🔍 Fetching trips for user:", user?.email)
 
@@ -57,7 +51,7 @@ export default function TripsPage() {
       await supabase.from("profiles").upsert(
         {
           id: user?.id,
-          email: user?.email!,
+          email: user?.email || '',
           full_name: user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Usuario",
           avatar_url: user?.user_metadata?.avatar_url || null,
         },
@@ -102,13 +96,13 @@ export default function TripsPage() {
 
       // Add shared trips
       if (memberData && !memberError) {
-        const sharedTrips = memberData
+        const sharedTrips: Trip[] = memberData
           .filter((member) => member.trips) // Ensure trip data exists
           .map((member) => ({
             ...member.trips,
             user_role: member.role,
             user_status: member.status,
-          }))
+          } as unknown as Trip))
 
         allTrips = [...allTrips, ...sharedTrips]
       }
@@ -123,7 +117,13 @@ export default function TripsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id, user?.email, user?.user_metadata?.full_name, user?.user_metadata?.avatar_url])
+
+  useEffect(() => {
+    if (user) {
+      fetchTrips()
+    }
+  }, [user, fetchTrips])
 
   const deleteTrip = async (tripId: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar este viaje?")) return
@@ -228,7 +228,7 @@ export default function TripsPage() {
                 daysUntil !== null &&
                 daysUntil <= 0 &&
                 getDaysUntilTrip(trip.end_date) !== null &&
-                getDaysUntilTrip(trip.end_date)! >= 0
+                (getDaysUntilTrip(trip.end_date) ?? -1) >= 0
 
               const isOwner = trip.created_by === user?.id
               const userRole = trip.user_role || "viewer"

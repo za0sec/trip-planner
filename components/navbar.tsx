@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useAuth } from "@/components/auth-provider"
 import { signOut } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
@@ -13,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plane, User, LogOut, Settings } from "lucide-react"
+import { User, LogOut, Settings } from "lucide-react"
 
 export function Navbar() {
   const { user } = useAuth()
@@ -35,11 +36,9 @@ export function Navbar() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <Plane className="h-5 w-5 text-white" />
-              </div>
-              <span className="font-bold text-xl text-gray-900">TravelPlanner</span>
+            <Link href="/" className="flex items-center space-x-3">
+              <Image src="/images/logo.png" alt="Trip Planner" width={32} height={32} className="h-8 w-8" />
+              <span className="font-bold text-xl text-gray-900">Trip Planner</span>
             </Link>
           </div>
 

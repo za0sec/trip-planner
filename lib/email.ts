@@ -34,7 +34,7 @@ async function sendWithResend(data: InvitationEmailData) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "TravelPlanner <invitations@your-domain.com>",
+      from: "Trip Planner <invitations@your-domain.com>",
       to: [data.to],
       subject: `Invitación a viaje: ${data.tripTitle}`,
       html: generateInvitationEmailHTML(data),
@@ -51,14 +51,14 @@ async function sendWithResend(data: InvitationEmailData) {
 // Simulation for development - no external calls
 async function sendWithSimulation(data: InvitationEmailData) {
   console.log("📧 EMAIL SIMULATION - INVITATION SENT!")
-  console.log("=" * 50)
+  console.log("=".repeat(50))
   console.log(`📬 To: ${data.to}`)
   console.log(`📝 Subject: Invitación a viaje: ${data.tripTitle}`)
   console.log(`🌍 Trip: ${data.tripTitle} → ${data.tripDestination}`)
   console.log(`👤 Inviter: ${data.inviterName} (${data.inviterEmail})`)
   console.log(`🔗 Invitation URL: ${data.invitationUrl}`)
   console.log(`👥 Role: ${data.role}`)
-  console.log("=" * 50)
+  console.log("=".repeat(50))
 
   // Simulate successful email sending
   return {
@@ -111,13 +111,13 @@ function generateInvitationEmailHTML(data: InvitationEmailData): string {
             <a href="${data.invitationUrl}" class="button">🎒 Unirme al Viaje</a>
           </div>
           
-          <p><small>Si no tienes una cuenta en TravelPlanner, podrás crear una usando este mismo email.</small></p>
+          <p><small>Si no tienes una cuenta en Trip Planner, podrás crear una usando este mismo email.</small></p>
           
           <div class="footer">
             <p>Este enlace expira en 7 días.</p>
             <p>Si no esperabas esta invitación, puedes ignorar este email.</p>
             <hr>
-            <p>TravelPlanner - Planifica viajes increíbles</p>
+            <p>Trip Planner - Planifica viajes increíbles</p>
           </div>
         </div>
       </div>

@@ -15,14 +15,14 @@ export default function DebugPage() {
   const testSupabaseConnection = async () => {
     addResult("🔄 Testing Supabase connection...")
     try {
-      const { data, error } = await supabase.from("profiles").select("count").limit(1)
+      const { error } = await supabase.from("profiles").select("count").limit(1)
       if (error) {
         addResult(`❌ Connection error: ${error.message}`)
       } else {
         addResult("✅ Supabase connection successful")
       }
-    } catch (error: any) {
-      addResult(`❌ Connection failed: ${error.message}`)
+    } catch (error: unknown) {
+      addResult(`❌ Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -35,8 +35,8 @@ export default function DebugPage() {
       } else {
         addResult(`✅ Auth working: ${data.session ? `User: ${data.session.user?.email}` : "No session"}`)
       }
-    } catch (error: any) {
-      addResult(`❌ Auth failed: ${error.message}`)
+    } catch (error: unknown) {
+      addResult(`❌ Auth failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 

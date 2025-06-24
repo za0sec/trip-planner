@@ -93,9 +93,9 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
 
       onItemAdded()
       onOpenChange(false)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error adding activity:", err)
-      setError(`Error al agregar la actividad: ${err.message}`)
+      setError(`Error al agregar la actividad: ${(err as Error).message}`)
     } finally {
       setLoading(false)
     }

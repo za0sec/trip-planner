@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       .eq('id', tripLocationId)
       .single()
 
-    let existingRecs: any[] = []
+    let existingRecs: { title: string; category: string }[] = []
     if (currentLocation?.trip_id) {
       // Get all location IDs for this trip
       const { data: tripLocations } = await supabase

@@ -98,9 +98,9 @@ export default function NewTripPage() {
       }
 
       router.push(`/trips/${data.id}`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Unexpected error:", error)
-      setError(`Error inesperado: ${error.message}`)
+              setError(`Error inesperado: ${(error as Error).message}`)
     } finally {
       setLoading(false)
     }
