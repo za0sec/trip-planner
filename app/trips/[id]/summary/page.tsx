@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Navbar } from "@/components/navbar"
 import { TripSummary } from "@/components/trip-summary"
+import { TutorialSystem } from "@/components/tutorial-system"
 import {
   ArrowLeft,
   PieChart,
@@ -187,6 +188,7 @@ export default function SummaryPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar />
+      <TutorialSystem type="summary" autoStart={true} />
       
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumbs y navegación */}
@@ -215,7 +217,7 @@ export default function SummaryPage() {
                 </Button>
               </Link>
               
-              <div>
+              <div data-tutorial="summary-header">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-3">
                   <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
                     <PieChart className="h-6 w-6 text-blue-600 dark:text-blue-400" />

@@ -92,7 +92,7 @@ export function TripSummary({ activities, expenses, tripCurrency }: TripSummaryP
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
+            <div className="md:col-span-2" data-tutorial="cost-chart">
               <h3 className="text-lg font-semibold mb-4">Distribución de Gastos por Categoría</h3>
               <div style={{ width: "100%", height: 350 }}>
                 <ResponsiveContainer>
@@ -120,11 +120,11 @@ export function TripSummary({ activities, expenses, tripCurrency }: TripSummaryP
             </div>
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Costos Totales</h3>
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800" data-tutorial="total-cost">
                 <div className="text-sm text-blue-700 dark:text-blue-300">Costo Total Planificado</div>
                 <div className="text-3xl font-bold text-blue-900 dark:text-blue-100">{formatCurrency(totalCost)}</div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2" data-tutorial="category-breakdown">
                 {chartData.map((item) => (
                   <div
                     key={item.name}

@@ -36,6 +36,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { AddItemDialog } from "@/components/add-item-dialog"
+import { TutorialSystem } from "@/components/tutorial-system"
 
 interface Trip {
   id: string
@@ -363,6 +364,7 @@ export default function TripDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       <Navbar />
+      <TutorialSystem type="trip_management" autoStart={true} />
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/trips">
@@ -374,7 +376,7 @@ export default function TripDetailPage() {
               <ArrowLeft className="h-4 w-4 mr-2" /> Volver
             </Button>
           </Link>
-          <div className="flex-1">
+          <div className="flex-1" data-tutorial="trip-header">
             <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h1 className="text-3xl font-bold">{trip.title}</h1>
               <Badge variant="outline" className="flex items-center gap-1 dark:border-gray-600 dark:text-gray-300">
@@ -445,7 +447,7 @@ export default function TripDetailPage() {
         </div>
 
         {/* Herramientas Avanzadas - Navegación a páginas */}
-        <div className="mb-8">
+        <div className="mb-8" data-tutorial="advanced-tools">
           <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200 flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-500" />
             Herramientas Avanzadas
@@ -456,6 +458,7 @@ export default function TripDetailPage() {
               <Button
                 variant="outline"
                 className="w-full h-auto p-4 flex flex-col items-start gap-2 hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/10"
+                data-tutorial="ai-card"
               >
                 <div className="flex items-center gap-2 w-full">
                   <div className="bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded">
@@ -474,6 +477,7 @@ export default function TripDetailPage() {
               <Button
                 variant="outline"
                 className="w-full h-auto p-4 flex flex-col items-start gap-2 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/10"
+                data-tutorial="summary-card"
               >
                 <div className="flex items-center gap-2 w-full">
                   <div className="bg-blue-100 dark:bg-blue-900/30 p-1.5 rounded">
@@ -492,6 +496,7 @@ export default function TripDetailPage() {
               <Button
                 variant="outline"
                 className="w-full h-auto p-4 flex flex-col items-start gap-2 hover:border-green-300 hover:bg-green-50 dark:hover:bg-green-900/10"
+                data-tutorial="collaboration-card"
               >
                 <div className="flex items-center gap-2 w-full">
                   <div className="bg-green-100 dark:bg-green-900/30 p-1.5 rounded">
@@ -507,11 +512,12 @@ export default function TripDetailPage() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6" data-tutorial="trip-tabs">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger
               value="planning"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/30"
+              data-tutorial="planning-tab"
             >
               <Edit className="h-4 w-4" />
               Planificación
@@ -519,6 +525,7 @@ export default function TripDetailPage() {
             <TabsTrigger
               value="itinerary"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/30"
+              data-tutorial="itinerary-tab"
             >
               <CalendarDays className="h-4 w-4" />
               Itinerario
@@ -526,6 +533,7 @@ export default function TripDetailPage() {
             <TabsTrigger
               value="expenses"
               className="flex items-center gap-2 data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/30"
+              data-tutorial="expenses-tab"
             >
               <DollarSign className="h-4 w-4" />
               Gastos

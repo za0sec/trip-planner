@@ -19,6 +19,12 @@ export type Database = {
           email: string
           full_name: string | null
           avatar_url: string | null
+            dashboard_tutorial_completed: boolean
+  create_trip_tutorial_completed: boolean
+  trip_management_tutorial_completed: boolean
+  ai_tutorial_completed: boolean
+  collaboration_tutorial_completed: boolean
+  summary_tutorial_completed: boolean
           created_at: string
           updated_at: string
         }
@@ -27,6 +33,11 @@ export type Database = {
           email: string
           full_name?: string | null
           avatar_url?: string | null
+          dashboard_tutorial_completed?: boolean
+          create_trip_tutorial_completed?: boolean
+          trip_management_tutorial_completed?: boolean
+          ai_tutorial_completed?: boolean
+          collaboration_tutorial_completed?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -35,6 +46,11 @@ export type Database = {
           email?: string
           full_name?: string | null
           avatar_url?: string | null
+          dashboard_tutorial_completed?: boolean
+          create_trip_tutorial_completed?: boolean
+          trip_management_tutorial_completed?: boolean
+          ai_tutorial_completed?: boolean
+          collaboration_tutorial_completed?: boolean
           created_at?: string
           updated_at?: string
         }

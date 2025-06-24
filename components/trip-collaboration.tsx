@@ -434,13 +434,13 @@ export function TripCollaboration({ tripId, isOwner }: TripCollaborationProps) {
             <p className="text-sm text-gray-600 mt-1">Personas que pueden ver y editar este viaje</p>
           </div>
           {isOwner && (
-            <Button onClick={() => setShowInviteDialog(true)}>
+            <Button onClick={() => setShowInviteDialog(true)} data-tutorial="invite-form">
               <UserPlus className="h-4 w-4 mr-2" />
               Invitar Persona
             </Button>
           )}
         </CardHeader>
-        <CardContent>
+        <CardContent data-tutorial="members-list">
           <div className="space-y-4">
             {members
               .filter((m) => m.status === "accepted")
@@ -649,7 +649,7 @@ export function TripCollaboration({ tripId, isOwner }: TripCollaborationProps) {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2" data-tutorial="member-roles">
               <Label htmlFor="role">Rol en el viaje</Label>
               <Select value={inviteForm.role} onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}>
                 <SelectTrigger>

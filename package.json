@@ -21,6 +21,7 @@
     "@radix-ui/react-toast": "^1.2.14",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.50.0",
+    "@types/react-joyride": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -30,6 +31,7 @@
     "react": "^18",
     "react-day-picker": "^9.7.0",
     "react-dom": "^18",
+    "react-joyride": "^2.9.3",
     "recharts": "^3.0.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7"

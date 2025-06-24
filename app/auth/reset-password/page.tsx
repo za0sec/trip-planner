@@ -84,9 +84,9 @@ export default function ResetPasswordPage() {
             <div className="flex items-center justify-center gap-3 mb-2">
               <Image src="/images/logo.png" alt="Trip Planner" width={24} height={24} className="h-6 w-6" />
               <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5" />
-                Restablecer Contraseña
-              </CardTitle>
+              <Lock className="h-5 w-5" />
+              Restablecer Contraseña
+            </CardTitle>
             </div>
             <CardDescription>Ingresa tu nueva contraseña</CardDescription>
           </CardHeader>

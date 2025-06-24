@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { TutorialSystem } from "@/components/tutorial-system"
 // Agregar el import al inicio del archivo
 // import { CreateTestInvitation } from "@/components/create-test-invitation"
 
@@ -314,8 +315,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" data-tutorial="welcome">
       <Navbar />
+      <TutorialSystem type="dashboard" autoStart={true} />
 
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
@@ -326,7 +328,7 @@ export default function DashboardPage() {
             <p className="text-gray-600 mt-2">Aquí tienes un resumen de tus viajes</p>
           </div>
           <Link href="/trips/new">
-            <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
+            <Button size="lg" className="bg-blue-600 hover:bg-blue-700" data-tutorial="create-trip">
               <PlusCircle className="mr-2 h-5 w-5" />
               Nuevo Viaje
             </Button>
@@ -338,7 +340,7 @@ export default function DashboardPage() {
 
         {/* Pending Invitations */}
         {pendingInvitations.length > 0 && (
-          <Card className="mb-8 border-blue-200 bg-blue-50">
+          <Card className="mb-8 border-blue-200 bg-blue-50" data-tutorial="pending-invitations">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-blue-900">
                 <Clock className="h-5 w-5" />
@@ -496,7 +498,7 @@ export default function DashboardPage() {
 
         {/* Recent Trips */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card>
+          <Card data-tutorial="trips-list">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />

@@ -61,7 +61,7 @@ export function Navbar() {
             {user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-tutorial="profile">
                     <Avatar className="h-8 w-8">
                       <AvatarImage
                         src={user.user_metadata?.avatar_url || "/placeholder.svg"}

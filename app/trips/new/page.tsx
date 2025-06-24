@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Navbar } from "@/components/navbar"
+import { TutorialSystem } from "@/components/tutorial-system"
 import { ArrowLeft, MapPin, Calendar } from "lucide-react"
 import Link from "next/link"
 
@@ -105,6 +106,7 @@ export default function NewTripPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
+      <TutorialSystem type="create_trip" autoStart={true} />
 
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="flex items-center gap-4 mb-8">
@@ -120,7 +122,7 @@ export default function NewTripPage() {
           </div>
         </div>
 
-        <Card>
+        <Card data-tutorial="trip-form">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" />
@@ -141,7 +143,7 @@ export default function NewTripPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
+              <div className="space-y-2" data-tutorial="trip-title">
                 <Label htmlFor="title">Título del Viaje *</Label>
                 <Input
                   id="title"
@@ -165,7 +167,7 @@ export default function NewTripPage() {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2" data-tutorial="trip-destination">
                 <Label htmlFor="destination">Destino *</Label>
                 <Input
                   id="destination"
@@ -177,7 +179,7 @@ export default function NewTripPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tutorial="trip-dates">
                 <div className="space-y-2">
                   <Label htmlFor="start_date" className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
@@ -201,7 +203,7 @@ export default function NewTripPage() {
                 </div>
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="bg-blue-50 p-4 rounded-lg" data-tutorial="trip-budget">
                 <h3 className="font-semibold text-blue-900 mb-2">💡 Próximos pasos</h3>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>• Podrás agregar presupuesto desde la página del viaje</li>
@@ -217,7 +219,7 @@ export default function NewTripPage() {
                     Cancelar
                   </Button>
                 </Link>
-                <Button type="submit" disabled={loading || !formData.title || !formData.destination} className="flex-1">
+                <Button type="submit" disabled={loading || !formData.title || !formData.destination} className="flex-1" data-tutorial="create-button">
                   {loading ? "Creando..." : "Crear Viaje"}
                 </Button>
               </div>

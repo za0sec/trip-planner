@@ -15,7 +15,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import {
   MapPin,
   Calendar,
-  Plus,
   Loader2,
   Sparkles,
   ChevronDown,
@@ -104,7 +103,6 @@ export function TripAIRecommendations({
   const [loading, setLoading] = useState(true)
   const [generatingRecommendations, setGeneratingRecommendations] = useState<Set<string>>(new Set())
   const [seasonalNotes, setSeasonalNotes] = useState<Record<string, string>>({})
-  const [showAddLocationDialog, setShowAddLocationDialog] = useState(false)
   const [editingLocation, setEditingLocation] = useState<string | null>(null)
   const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set())
   const [locationGroups, setLocationGroups] = useState<{ [key: string]: TripLocation[] }>({})
@@ -126,13 +124,7 @@ export function TripAIRecommendations({
   useEffect(() => {
     localStorage.setItem(`expandedLocations_${tripId}`, JSON.stringify(Array.from(expandedLocations)))
   }, [expandedLocations, tripId])
-  const [newLocation, setNewLocation] = useState({
-    date: '',
-    location: '',
-    city: '',
-    country: '',
-    notes: ''
-  })
+
   const [bulkGeneration, setBulkGeneration] = useState({
     startDate: '',
     endDate: '',
@@ -201,33 +193,6 @@ export function TripAIRecommendations({
     fetchLocations()
   }, [tripId, fetchLocations])
 
-  const addLocation = async () => {
-    if (!user || !newLocation.date || !newLocation.location) return
-
-    try {
-      const { data, error } = await supabase
-        .from('trip_locations')
-        .insert({
-          trip_id: tripId,
-          date: newLocation.date,
-          location: newLocation.location,
-          city: newLocation.city || null,
-          country: newLocation.country || null,
-          notes: newLocation.notes || null,
-          created_by: user.id
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      setLocations(prev => [...prev, data])
-      setNewLocation({ date: '', location: '', city: '', country: '', notes: '' })
-      setShowAddLocationDialog(false)
-    } catch (error) {
-      console.error('Error adding location:', error)
-    }
-  }
 
   const updateLocation = async (locationId: string, updates: Partial<TripLocation>) => {
     try {
@@ -594,7 +559,7 @@ export function TripAIRecommendations({
                   </div>
                 )}
                 
-                <Tabs defaultValue="restaurants" className="w-full">
+                <Tabs defaultValue="restaurants" className="w-full" data-tutorial="recommendation-tabs">
                   <TabsList className="grid w-full grid-cols-6">
                     {Object.entries(categoryNames).map(([key, name]) => (
                       <TabsTrigger key={key} value={key} className="text-xs">
@@ -701,7 +666,7 @@ export function TripAIRecommendations({
                         Genera recomendaciones personalizadas con IA para este día
                       </p>
                       {canEdit && (
-                        <Button onClick={() => generateRecommendations(location)}>
+                        <Button onClick={() => generateRecommendations(location)} data-tutorial="generate-recommendations">
                           <Sparkles className="h-4 w-4 mr-2" />
                           Generar Recomendaciones
                         </Button>
@@ -742,7 +707,7 @@ export function TripAIRecommendations({
             <div className="flex gap-2">
               <Dialog open={showBulkGenerationDialog} onOpenChange={setShowBulkGenerationDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" data-tutorial="location-form">
                     <Sparkles className="h-4 w-4 mr-2" />
                     Generar Rango
                   </Button>
@@ -816,6 +781,7 @@ export function TripAIRecommendations({
                       <Button 
                         onClick={generateBulkRecommendations} 
                         disabled={!bulkGeneration.startDate || !bulkGeneration.endDate || !bulkGeneration.location || generatingBulk}
+                        data-tutorial="generate-recommendations"
                       >
                         {generatingBulk ? (
                           <>
@@ -849,85 +815,6 @@ export function TripAIRecommendations({
                   </div>
                 </DialogContent>
               </Dialog>
-              
-              <Dialog open={showAddLocationDialog} onOpenChange={setShowAddLocationDialog}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar Día
-                  </Button>
-                </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Agregar Ubicación por Día</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="date">Fecha</Label>
-                    <Input
-                      id="date"
-                      type="date"
-                      value={newLocation.date}
-                      onChange={(e) => setNewLocation(prev => ({ ...prev, date: e.target.value }))}
-                      min={startDate || undefined}
-                      max={endDate || undefined}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="location">Ubicación/Lugar</Label>
-                    <Input
-                      id="location"
-                      placeholder="ej. Centro de Madrid, Torre Eiffel..."
-                      value={newLocation.location}
-                      onChange={(e) => setNewLocation(prev => ({ ...prev, location: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="city">Ciudad (opcional)</Label>
-                    <Input
-                      id="city"
-                      placeholder="ej. Madrid"
-                      value={newLocation.city}
-                      onChange={(e) => setNewLocation(prev => ({ ...prev, city: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="country">País (opcional)</Label>
-                    <Input
-                      id="country"
-                      placeholder="ej. España"
-                      value={newLocation.country}
-                      onChange={(e) => setNewLocation(prev => ({ ...prev, country: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="notes">Notas (opcional)</Label>
-                    <Textarea
-                      id="notes"
-                      placeholder="Preferencias especiales, tipo de comida, presupuesto..."
-                      value={newLocation.notes}
-                      onChange={(e) => setNewLocation(prev => ({ ...prev, notes: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={addLocation} disabled={!newLocation.date || !newLocation.location}>
-                      <Save className="h-4 w-4 mr-2" />
-                      Guardar
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        setShowAddLocationDialog(false)
-                        setNewLocation({ date: '', location: '', city: '', country: '', notes: '' })
-                      }}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
             </div>
           )}
         </CardHeader>
@@ -942,12 +829,6 @@ export function TripAIRecommendations({
                   : "El organizador del viaje aún no ha agregado ubicaciones por día."
                 }
               </p>
-              {canEdit && (
-                <Button onClick={() => setShowAddLocationDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Primera Ubicación
-                </Button>
-              )}
             </div>
           ) : (
             <div className="space-y-6">
