@@ -18,7 +18,7 @@ export const signUp = async (email: string, password: string, fullName: string) 
       data: {
         full_name: fullName,
       },
-      emailRedirectTo: `${getBaseUrl()}/auth/confirm`,
+      emailRedirectTo: `https://tripplanner.cloud/auth/confirm`,
     },
   })
 
