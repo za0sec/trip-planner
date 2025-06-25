@@ -1070,6 +1070,8 @@ export default function TripDetailPage() {
           onOpenChange={setShowAddDialog}
           tripId={trip.id}
           tripCurrency={trip.currency}
+          tripStartDate={trip.start_date}
+          tripEndDate={trip.end_date}
           onItemAdded={fetchTripData}
         />
       )}

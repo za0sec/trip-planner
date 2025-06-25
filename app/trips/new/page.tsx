@@ -11,23 +11,38 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { TutorialSystem } from "@/components/tutorial-system"
-import { ArrowLeft, MapPin, Calendar } from "lucide-react"
+import { usePersistentForm } from "@/hooks/use-persistent-form"
+import { ArrowLeft, MapPin, Calendar, CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import { cn } from "@/lib/utils"
 import Link from "next/link"
+
+interface FormData {
+  title: string
+  description: string
+  destination: string
+  start_date: Date | undefined
+  end_date: Date | undefined
+}
 
 export default function NewTripPage() {
   const { user } = useAuth()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
+  
+  const { state: formData, updateState, clearState, isLoaded } = usePersistentForm<FormData>('create-trip-form', {
     title: "",
     description: "",
     destination: "",
-    start_date: "",
-    end_date: "",
+    start_date: undefined,
+    end_date: undefined,
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,10 +81,10 @@ export default function NewTripPage() {
         title: formData.title,
         description: formData.description || null,
         destination: formData.destination,
-        start_date: formData.start_date || null,
-        end_date: formData.end_date || null,
+        start_date: formData.start_date ? formData.start_date.toISOString().split('T')[0] : null,
+        end_date: formData.end_date ? formData.end_date.toISOString().split('T')[0] : null,
         budget: null,
-        currency: "USD",
+        currency: "U$D",
         created_by: user.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -85,6 +100,9 @@ export default function NewTripPage() {
 
       console.log("✅ Trip created successfully:", data.id)
 
+      // Limpiar el formulario después de crear exitosamente
+      clearState()
+
       // Note: The user is automatically added as owner via database trigger
       // No need to manually insert into trip_members
 
@@ -98,10 +116,21 @@ export default function NewTripPage() {
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
+    updateState({
       [e.target.name]: e.target.value,
     })
+  }
+
+  // No renderizar hasta que el estado esté cargado
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p>Cargando formulario...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -185,25 +214,78 @@ export default function NewTripPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tutorial="trip-dates">
                 <div className="space-y-2">
-                  <Label htmlFor="start_date" className="flex items-center gap-2">
+                  <Label className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Fecha de Inicio
                   </Label>
-                  <Input
-                    id="start_date"
-                    name="start_date"
-                    type="date"
-                    value={formData.start_date}
-                    onChange={handleChange}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !formData.start_date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.start_date ? (
+                          format(formData.start_date, "PPP", { locale: es })
+                        ) : (
+                          <span>Selecciona fecha de inicio</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <CalendarComponent
+                        mode="single"
+                        selected={formData.start_date}
+                        onSelect={(date) => updateState({ start_date: date })}
+                        disabled={(date) => date < new Date()}
+                        defaultMonth={formData.start_date || new Date()}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="end_date" className="flex items-center gap-2">
+                  <Label className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Fecha de Fin
                   </Label>
-                  <Input id="end_date" name="end_date" type="date" value={formData.end_date} onChange={handleChange} />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !formData.end_date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.end_date ? (
+                          format(formData.end_date, "PPP", { locale: es })
+                        ) : (
+                          <span>Selecciona fecha de fin</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <CalendarComponent
+                        mode="single"
+                        selected={formData.end_date}
+                        onSelect={(date) => updateState({ end_date: date })}
+                        disabled={(date) => {
+                          if (formData.start_date) {
+                            return date < formData.start_date
+                          }
+                          return date < new Date()
+                        }}
+                        defaultMonth={formData.end_date || formData.start_date || new Date()}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 

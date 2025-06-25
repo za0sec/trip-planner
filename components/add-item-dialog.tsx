@@ -3,6 +3,7 @@
 import { useState, useEffect, type FormEvent } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/components/auth-provider"
+import { usePersistentForm } from "@/hooks/use-persistent-form"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -28,6 +29,8 @@ interface AddItemDialogProps {
   onOpenChange: (open: boolean) => void
   tripId: string
   tripCurrency: string
+  tripStartDate?: string | null
+  tripEndDate?: string | null
   onItemAdded: () => void
 }
 
@@ -41,29 +44,37 @@ const activityCategories = [
   { value: "other", label: "Otro", icon: MoreHorizontal },
 ]
 
-export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItemAdded }: AddItemDialogProps) {
+interface ActivityFormData {
+  title: string
+  description: string
+  category: string
+  date: string | undefined // Cambiar a string para localStorage
+  location: string
+  estimatedCost: string
+}
+
+export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, tripStartDate, tripEndDate, onItemAdded }: AddItemDialogProps) {
   const { user } = useAuth()
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [category, setCategory] = useState("")
-  const [date, setDate] = useState<Date | undefined>(undefined)
-  const [location, setLocation] = useState("")
-  const [estimatedCost, setEstimatedCost] = useState("")
+  
+  const { state: formData, updateState, clearState, isLoaded } = usePersistentForm<ActivityFormData>(`add-activity-${tripId}`, {
+    title: "",
+    description: "",
+    category: "",
+    date: undefined,
+    location: "",
+    estimatedCost: "",
+  })
+  
   const [image, setImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pasteIndicator, setPasteIndicator] = useState<string | null>(null)
 
   useEffect(() => {
     if (open) {
-      // Reset form when dialog opens
-      setTitle("")
-      setDescription("")
-      setCategory("")
-      setDate(undefined)
-      setLocation("")
-      setEstimatedCost("")
+      // Solo resetear imagen y estados de UI, no el formulario persistente
       setImage(null)
       setImagePreview(null)
       setError(null)
@@ -71,20 +82,56 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
     }
   }, [open])
 
+  // Manejar pegado de imágenes
+  useEffect(() => {
+    if (!open) return
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item.type.indexOf('image') !== -1) {
+          e.preventDefault()
+          const file = item.getAsFile()
+          if (file) {
+            console.log('📋 Imagen pegada:', file.name, file.type, file.size)
+            setPasteIndicator(`📋 Imagen pegada: ${file.type}`)
+            handleImageFile(file)
+            // Limpiar indicador después de 3 segundos
+            setTimeout(() => setPasteIndicator(null), 3000)
+          }
+          break
+        }
+      }
+    }
+
+    document.addEventListener('paste', handlePaste)
+    return () => {
+      document.removeEventListener('paste', handlePaste)
+    }
+  }, [open])
+
+  const handleImageFile = (file: File) => {
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      setError("La imagen debe ser menor a 5MB")
+      return
+    }
+    
+    setImage(file)
+    const reader = new FileReader()
+    reader.onload = () => {
+      setImagePreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+    setError(null) // Limpiar errores previos
+  }
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        setError("La imagen debe ser menor a 5MB")
-        return
-      }
-      
-      setImage(file)
-      const reader = new FileReader()
-      reader.onload = () => {
-        setImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+      handleImageFile(file)
     }
   }
 
@@ -125,7 +172,7 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!title || !category) {
+    if (!formData.title || !formData.category) {
       setError("El título y la categoría son obligatorios.")
       return
     }
@@ -136,12 +183,12 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
       // First create the activity
       const { data: activityData, error: insertError } = await supabase.from("activities").insert({
         trip_id: tripId,
-        title,
-        description,
-        category,
-        date: date ? date.toISOString() : null,
-        location,
-        estimated_cost: estimatedCost ? Number.parseFloat(estimatedCost) : null,
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        date: formData.date || null,
+        location: formData.location,
+        estimated_cost: formData.estimatedCost ? Number.parseFloat(formData.estimatedCost) : null,
         created_by: user?.id,
       }).select().single()
 
@@ -167,6 +214,8 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
         }
       }
 
+      // Limpiar formulario después del éxito
+      clearState()
       onItemAdded()
       onOpenChange(false)
     } catch (err: unknown) {
@@ -175,6 +224,19 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
     } finally {
       setLoading(false)
     }
+  }
+
+  // No renderizar hasta que el estado esté cargado
+  if (!isLoaded) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[480px]">
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
   return (
@@ -193,8 +255,8 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
             </Label>
             <Input
               id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              value={formData.title}
+              onChange={(e) => updateState({ title: e.target.value })}
               className="col-span-3"
               placeholder="Ej: Vuelo a Madrid"
               required
@@ -205,7 +267,7 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
             <Label htmlFor="category" className="text-right">
               Categoría
             </Label>
-            <Select value={category} onValueChange={setCategory} required>
+            <Select value={formData.category} onValueChange={(value) => updateState({ category: value })} required>
               <SelectTrigger className="col-span-3">
                 <SelectValue placeholder="Selecciona una categoría" />
               </SelectTrigger>
@@ -228,8 +290,8 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
             </Label>
             <Textarea
               id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={formData.description}
+              onChange={(e) => updateState({ description: e.target.value })}
               className="col-span-3"
               placeholder="Ej: Vuelo de ida, reserva #12345"
             />
@@ -243,14 +305,97 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
-                  className={cn("col-span-3 justify-start text-left font-normal", !date && "text-muted-foreground")}
+                  className={cn("col-span-3 justify-start text-left font-normal", !formData.date && "text-muted-foreground")}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, "PPP", { locale: es }) : <span>Selecciona una fecha</span>}
+                  {formData.date ? (() => {
+                    // Crear fecha sin problemas de zona horaria
+                    const [year, month, day] = formData.date.split('-')
+                    const displayDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                    
+                    console.log('🖥️ Mostrando fecha:', {
+                      storedDate: formData.date,
+                      displayDate: displayDate,
+                      formatted: format(displayDate, "PPP", { locale: es })
+                    })
+                    
+                    return format(displayDate, "PPP", { locale: es })
+                  })() : <span>Selecciona una fecha</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+                <Calendar 
+                  mode="single" 
+                  selected={formData.date ? (() => {
+                    const [year, month, day] = formData.date.split('-')
+                    const selectedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                    
+                    console.log('🎯 Fecha seleccionada en calendario:', {
+                      storedDate: formData.date,
+                      selectedDate: selectedDate
+                    })
+                    
+                    return selectedDate
+                  })() : undefined} 
+                  onSelect={(date) => {
+                    if (date) {
+                      // Formatear fecha sin problemas de zona horaria
+                      const year = date.getFullYear()
+                      const month = String(date.getMonth() + 1).padStart(2, '0')
+                      const day = String(date.getDate()).padStart(2, '0')
+                      const dateString = `${year}-${month}-${day}`
+                      
+                      console.log('📅 Fecha seleccionada:', {
+                        originalDate: date,
+                        formattedString: dateString
+                      })
+                      
+                      updateState({ date: dateString })
+                    } else {
+                      updateState({ date: undefined })
+                    }
+                  }} 
+                  disabled={(date) => {
+                    // Debug: log de las fechas
+                    console.log('🔍 Debug fechas:', {
+                      tripStartDate,
+                      tripEndDate,
+                      dateToCheck: date.toISOString().split('T')[0]
+                    })
+                    
+                    // Deshabilitar fechas fuera del rango del viaje
+                    if (tripStartDate && tripEndDate) {
+                      // Usar comparación directa de strings YYYY-MM-DD para evitar problemas de zona horaria
+                      const dateString = date.toISOString().split('T')[0]
+                      
+                      console.log('🔍 Comparación directa:', {
+                        tripStartDate,
+                        tripEndDate,
+                        dateString,
+                        isBeforeStart: dateString < tripStartDate,
+                        isAfterEnd: dateString > tripEndDate
+                      })
+                      
+                      return dateString < tripStartDate || dateString > tripEndDate
+                    }
+                    // Si no hay fechas del viaje, deshabilitar fechas pasadas
+                    const today = new Date()
+                    const normalizedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+                    const dateToCheck = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+                    return dateToCheck < normalizedToday
+                  }}
+                  defaultMonth={
+                    formData.date ? (() => {
+                      const [year, month, day] = formData.date.split('-')
+                      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                    })() : 
+                    (tripStartDate ? (() => {
+                      const [year, month, day] = tripStartDate.split('-')
+                      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                    })() : new Date())
+                  }
+                  initialFocus 
+                />
               </PopoverContent>
             </Popover>
           </div>
@@ -261,8 +406,8 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
             </Label>
             <Input
               id="location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              value={formData.location}
+              onChange={(e) => updateState({ location: e.target.value })}
               className="col-span-3"
               placeholder="Ej: Aeropuerto de Barajas"
             />
@@ -276,12 +421,11 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
               <Input
                 id="estimatedCost"
                 type="number"
-                value={estimatedCost}
-                onChange={(e) => setEstimatedCost(e.target.value)}
-                className="pl-7"
-                placeholder="0.00"
+                value={formData.estimatedCost}
+                onChange={(e) => updateState({ estimatedCost: e.target.value })}
+                className="pl-2"
+                placeholder={`${tripCurrency} 0.00`}
               />
-              <span className="absolute left-2.5 top-2.5 text-sm text-muted-foreground">{tripCurrency}</span>
             </div>
           </div>
 
@@ -306,6 +450,7 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
                     <Upload className="h-8 w-8" />
                     <span>Subir imagen</span>
                     <span className="text-xs text-gray-400">PNG, JPG hasta 5MB</span>
+                    <span className="text-xs text-blue-500 font-medium">💡 También puedes pegar (Ctrl+V)</span>
                   </label>
                 </div>
               ) : (
@@ -330,14 +475,25 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, onItem
           </div>
 
           {error && <p className="text-red-500 text-sm col-span-4 text-center">{error}</p>}
+          {pasteIndicator && <p className="text-green-600 text-sm col-span-4 text-center">{pasteIndicator}</p>}
         </form>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
+        <DialogFooter className="flex justify-between">
+          <Button 
+            type="button" 
+            variant="ghost" 
+            onClick={clearState}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            Limpiar formulario
           </Button>
-          <Button type="submit" form="addItemForm" onClick={handleSubmit} disabled={loading || uploadingImage}>
-            {loading ? "Agregando..." : uploadingImage ? "Subiendo imagen..." : "Agregar Actividad"}
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="addItemForm" onClick={handleSubmit} disabled={loading || uploadingImage}>
+              {loading ? "Agregando..." : uploadingImage ? "Subiendo imagen..." : "Agregar Actividad"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
