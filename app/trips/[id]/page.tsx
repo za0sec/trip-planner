@@ -363,9 +363,12 @@ export default function TripDetailPage() {
     new Date() <= new Date(trip.end_date)
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col">
-      <Navbar />
+    <>
+      {/* Tutorial PRIMERO - antes de cualquier verificación */}
       <TutorialSystem type="trip_management" autoStart={true} />
+      
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col">
+        <Navbar />
       <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/trips">
@@ -1072,5 +1075,6 @@ export default function TripDetailPage() {
       )}
       <Footer />
     </div>
+    </>
   )
 }

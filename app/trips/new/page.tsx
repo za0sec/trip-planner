@@ -105,9 +105,12 @@ export default function NewTripPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Navbar />
+    <>
+      {/* Tutorial PRIMERO - antes de cualquier verificación */}
       <TutorialSystem type="create_trip" autoStart={true} />
+      
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Navbar />
 
       <div className="container mx-auto px-4 py-8 max-w-2xl flex-1">
         <div className="flex items-center gap-4 mb-8">
@@ -123,7 +126,7 @@ export default function NewTripPage() {
           </div>
         </div>
 
-        <Card data-tutorial="trip-form">
+        <Card data-tutorial="create-form">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" />
@@ -230,5 +233,6 @@ export default function NewTripPage() {
       </div>
       <Footer />
     </div>
+    </>
   )
 }

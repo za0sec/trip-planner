@@ -310,15 +310,22 @@ export default function DashboardPage() {
     )
   }
 
-  // Don't render anything if no user (redirect will happen)
-  if (!user) {
-    return null
-  }
-
   return (
-          <div className="min-h-screen bg-gray-50 flex flex-col" data-tutorial="welcome">
-        <Navbar />
-        <TutorialSystem type="dashboard" autoStart={true} />
+    <>
+      {/* Tutorial PRIMERO - antes de cualquier verificación */}
+      <TutorialSystem type="dashboard" autoStart={true} />
+      
+      {!user ? (
+        // Mientras redirige, mostrar loading
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando...</p>
+          </div>
+        </div>
+      ) : (
+        <div className="min-h-screen bg-gray-50 flex flex-col" data-tutorial="welcome">
+          <Navbar />
 
         <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex justify-between items-center mb-8">
@@ -336,12 +343,10 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* Agregar aquí el componente de testing */}
-        {/* <CreateTestInvitation /> */}
 
         {/* Pending Invitations */}
         {pendingInvitations.length > 0 && (
-          <Card className="mb-8 border-blue-200 bg-blue-50" data-tutorial="pending-invitations">
+          <Card className="mb-8 border-blue-200 bg-blue-50" data-tutorial="invitations">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-blue-900">
                 <Clock className="h-5 w-5" />
@@ -626,5 +631,7 @@ export default function DashboardPage() {
         <Footer />
       </div>
     </div>
+      )}
+    </>
   )
 }

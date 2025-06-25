@@ -118,9 +118,12 @@ export default function CollaborationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-      <Navbar />
+    <>
+      {/* Tutorial PRIMERO - antes de cualquier verificación */}
       <TutorialSystem type="collaboration" autoStart={true} />
+      
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+        <Navbar />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
         {/* Breadcrumbs y navegación */}
@@ -191,5 +194,6 @@ export default function CollaborationPage() {
       </div>
       <Footer />
     </div>
+    </>
   )
 } 

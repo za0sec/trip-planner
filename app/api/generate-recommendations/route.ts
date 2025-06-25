@@ -118,7 +118,7 @@ ${notes ? `- Preferencias especiales: ${notes}` : ''}
 🚫 PROHIBIDO REPETIR ESTOS LUGARES:
 ${existingTitles.length > 0 ? `NUNCA recomiendes estos lugares que ya están en otros días: ${existingTitles.join(', ')}. Cada recomendación DEBE ser completamente diferente.` : 'Es el primer día del viaje.'}
 
-Genera exactamente 3 recomendaciones ÚNICAS para CADA categoría:
+Genera exactamente 5 recomendaciones ÚNICAS para CADA categoría:
 1. restaurants (restaurantes)
 2. attractions (atracciones turísticas)  
 3. activities (actividades)
@@ -164,15 +164,7 @@ Responde SOLO con JSON válido:
   ],
   "seasonal_note": "Aviso sobre clima/temporada si es relevante"
 }
-
-⚠️ REGLAS CRÍTICAS:
-1. NUNCA repitas ningún lugar de la lista prohibida
-2. Cada recomendación debe tener un nombre COMPLETAMENTE DIFERENTE
-3. Si conoces un lugar similar, busca una alternativa en el mismo barrio/zona
-4. Verifica que el nombre del lugar sea único antes de recomendarlo
-5. Prioriza variedad geográfica dentro de la ciudad
-
-VERIFICACIÓN FINAL: Antes de enviar tu respuesta, revisa que NINGÚN título coincida con la lista prohibida.`
+`
 
     // Generate recommendations with OpenAI
     const completion = await openai.chat.completions.create({

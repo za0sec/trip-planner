@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,14 +10,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   MapPin,
   Calendar,
   Loader2,
   Sparkles,
-  ChevronDown,
   Utensils,
   Camera,
   ShoppingBag,
@@ -26,12 +23,10 @@ import {
   ExternalLink,
   Phone,
   Clock,
-
-  Trash2,
-  Edit,
-  Save,
-  X,
-  AlertTriangle
+  AlertTriangle,
+  Check,
+  Plus,
+  Trash2
 } from "lucide-react"
 
 interface TripLocation {
@@ -72,6 +67,27 @@ interface TripAIRecommendationsProps {
   endDate?: string | null
 }
 
+interface DayInfo {
+  date: string
+  dayNumber: number
+  dayName: string
+  formattedDate: string
+}
+
+interface LocationSegment {
+  id: string
+  startDay: number
+  endDay: number
+  location: string
+  city: string
+  country: string
+  notes: string
+  days: DayInfo[]
+  isConfigured: boolean
+  tripLocationIds: string[]
+  color: string
+}
+
 const categoryIcons = {
   restaurants: Utensils,
   attractions: Camera,
@@ -83,12 +99,24 @@ const categoryIcons = {
 
 const categoryNames = {
   restaurants: "Restaurantes",
-  attractions: "Atracciones",
+  attractions: "Atracciones", 
   activities: "Actividades",
   museums: "Museos",
   nightlife: "Vida Nocturna",
   shopping: "Compras",
 } as const
+
+// Colores para los segmentos
+const segmentColors = [
+  'bg-blue-500',
+  'bg-green-500', 
+  'bg-purple-500',
+  'bg-red-500',
+  'bg-yellow-500',
+  'bg-pink-500',
+  'bg-indigo-500',
+  'bg-orange-500'
+]
 
 export function TripAIRecommendations({ 
   tripId, 
@@ -98,46 +126,64 @@ export function TripAIRecommendations({
   endDate 
 }: TripAIRecommendationsProps) {
   const { user } = useAuth()
-  const [locations, setLocations] = useState<TripLocation[]>([])
-  const [recommendations, setRecommendations] = useState<{ [key: string]: AIRecommendation[] }>({})
+  const [allDays, setAllDays] = useState<DayInfo[]>([])
+  const [segments, setSegments] = useState<LocationSegment[]>([])
+  const [recommendations, setRecommendations] = useState<{ [segmentId: string]: AIRecommendation[] }>({})
   const [loading, setLoading] = useState(true)
   const [generatingRecommendations, setGeneratingRecommendations] = useState<Set<string>>(new Set())
   const [seasonalNotes, setSeasonalNotes] = useState<Record<string, string>>({})
-  const [editingLocation, setEditingLocation] = useState<string | null>(null)
-  const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set())
-  const [locationGroups, setLocationGroups] = useState<{ [key: string]: TripLocation[] }>({})
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false)
+  const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set())
+  const [editingSegments, setEditingSegments] = useState<Set<string>>(new Set())
+  
+  // Estados para la selección por arrastre
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [selectionStart, setSelectionStart] = useState<number | null>(null)
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null)
+  const [dragPreview, setDragPreview] = useState<{start: number, end: number} | null>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
 
-  // Load expanded state from localStorage on component mount
-  useEffect(() => {
-    const savedExpanded = localStorage.getItem(`expandedLocations_${tripId}`)
-    if (savedExpanded) {
-      try {
-        const expandedArray = JSON.parse(savedExpanded)
-        setExpandedLocations(new Set(expandedArray))
-      } catch (error) {
-        console.error('Error loading expanded locations:', error)
-      }
+  // Generar todos los días del viaje
+  const generateAllDays = useCallback(() => {
+    if (!startDate || !endDate) return []
+
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const days: DayInfo[] = []
+    
+    const currentDate = new Date(start)
+    let dayNumber = 1
+
+    while (currentDate <= end) {
+      const dateStr = currentDate.toISOString().split('T')[0]
+      days.push({
+        date: dateStr,
+        dayNumber,
+        dayName: currentDate.toLocaleDateString('es-ES', { weekday: 'short' }),
+        formattedDate: currentDate.toLocaleDateString('es-ES', { 
+          day: 'numeric', 
+          month: 'short' 
+        })
+      })
+      
+      currentDate.setDate(currentDate.getDate() + 1)
+      dayNumber++
     }
-  }, [tripId])
 
-  // Save expanded state to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem(`expandedLocations_${tripId}`, JSON.stringify(Array.from(expandedLocations)))
-  }, [expandedLocations, tripId])
+    return days
+  }, [startDate, endDate])
 
-  const [bulkGeneration, setBulkGeneration] = useState({
-    startDate: '',
-    endDate: '',
-    location: '',
-    city: '',
-    country: '',
-    notes: ''
-  })
-  const [showBulkGenerationDialog, setShowBulkGenerationDialog] = useState(false)
-  const [generatingBulk, setGeneratingBulk] = useState(false)
-
-  const fetchLocations = useCallback(async () => {
+  // Cargar ubicaciones existentes
+  const loadExistingData = useCallback(async () => {
     try {
+      const days = generateAllDays()
+      setAllDays(days)
+
+      if (days.length === 0) {
+        setLoading(false)
+        return
+      }
+
       const { data: locationsData, error } = await supabase
         .from('trip_locations')
         .select('*')
@@ -146,281 +192,315 @@ export function TripAIRecommendations({
 
       if (error) throw error
 
-      setLocations(locationsData || [])
+      // Si hay ubicaciones existentes, inferir segmentos
+      if (locationsData && locationsData.length > 0) {
+        // Agrupar ubicaciones consecutivas por ubicación base
+        const inferredSegments: LocationSegment[] = []
+        let currentSegment: LocationSegment | null = null
+        let segmentIndex = 0
 
-      // Group locations by base location
-      const groups: { [key: string]: TripLocation[] } = {}
-      ;(locationsData || []).forEach(location => {
-        const key = `${location.location}-${location.city || ''}-${location.country || ''}`
-        if (!groups[key]) {
-          groups[key] = []
+        locationsData.forEach((loc) => {
+          const dayNum = days.findIndex(d => d.date === loc.date) + 1
+          const locationKey = `${loc.location}-${loc.city || ''}-${loc.country || ''}`
+          
+          if (!currentSegment || 
+              `${currentSegment.location}-${currentSegment.city}-${currentSegment.country}` !== locationKey) {
+            // Nuevo segmento
+            if (currentSegment) {
+              inferredSegments.push(currentSegment)
+              segmentIndex++
+            }
+            
+            currentSegment = {
+              id: `segment-${Date.now()}-${segmentIndex}`,
+              startDay: dayNum,
+              endDay: dayNum,
+              location: loc.location,
+              city: loc.city || '',
+              country: loc.country || '',
+              notes: loc.notes || '',
+              days: [days[dayNum - 1]],
+              isConfigured: true,
+              tripLocationIds: [loc.id],
+              color: segmentColors[segmentIndex % segmentColors.length]
+            }
+          } else {
+            // Extender segmento actual
+            currentSegment.endDay = dayNum
+            currentSegment.days.push(days[dayNum - 1])
+            currentSegment.tripLocationIds.push(loc.id)
+          }
+        })
+
+        if (currentSegment) {
+          inferredSegments.push(currentSegment)
         }
-        groups[key].push(location)
-      })
-      setLocationGroups(groups)
 
-      // Fetch recommendations for each location
-      const recommendationsPromises = (locationsData || []).map(async (location: TripLocation) => {
-        const { data: recData, error: recError } = await supabase
-          .from('ai_recommendations')
-          .select('*')
-          .eq('trip_location_id', location.id)
+        setSegments(inferredSegments)
 
-        if (recError) {
-          console.error('Error fetching recommendations:', recError)
-          return { locationId: location.id, recommendations: [] }
-        }
+        // Cargar recomendaciones
+        const recommendationsPromises = locationsData.map(async (location: TripLocation) => {
+          const { data: recData, error: recError } = await supabase
+            .from('ai_recommendations')
+            .select('*')
+            .eq('trip_location_id', location.id)
 
-        return { locationId: location.id, recommendations: recData || [] }
-      })
+          if (recError) {
+            console.error('Error fetching recommendations:', recError)
+            return { locationId: location.id, recommendations: [] }
+          }
 
-      const recommendationsResults = await Promise.all(recommendationsPromises)
-      const recommendationsMap: { [key: string]: AIRecommendation[] } = {}
-      
-      recommendationsResults.forEach(({ locationId, recommendations: recs }) => {
-        recommendationsMap[locationId] = recs
-      })
+          return { locationId: location.id, recommendations: recData || [] }
+        })
 
-      setRecommendations(recommendationsMap)
+        const recommendationsResults = await Promise.all(recommendationsPromises)
+        const recommendationsMap: { [key: string]: AIRecommendation[] } = {}
+        
+        recommendationsResults.forEach(({ locationId, recommendations: recs }) => {
+          recommendationsMap[locationId] = recs
+        })
+
+        setRecommendations(recommendationsMap)
+      }
+
     } catch (error) {
-      console.error('Error fetching locations:', error)
+      console.error('Error loading data:', error)
     } finally {
       setLoading(false)
     }
-  }, [tripId])
+  }, [tripId, generateAllDays])
 
   useEffect(() => {
-    fetchLocations()
-  }, [tripId, fetchLocations])
+    loadExistingData()
+  }, [loadExistingData])
 
-
-  const updateLocation = async (locationId: string, updates: Partial<TripLocation>) => {
-    try {
-      const { data, error } = await supabase
-        .from('trip_locations')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', locationId)
-        .select()
-        .single()
-
-      if (error) throw error
-
-      setLocations(prev => prev.map(loc => loc.id === locationId ? data : loc))
-      setEditingLocation(null)
-    } catch (error) {
-      console.error('Error updating location:', error)
-    }
+  // Verificar si un día está ocupado por algún segmento
+  const isDayOccupied = (dayNumber: number) => {
+    return segments.some(segment => 
+      dayNumber >= segment.startDay && dayNumber <= segment.endDay
+    )
   }
 
-  const deleteLocation = async (locationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('trip_locations')
-        .delete()
-        .eq('id', locationId)
-
-      if (error) throw error
-
-      setLocations(prev => prev.filter(loc => loc.id !== locationId))
-      setRecommendations(prev => {
-        const updated = { ...prev }
-        delete updated[locationId]
-        return updated
-      })
-    } catch (error) {
-      console.error('Error deleting location:', error)
-    }
+  // Obtener el segmento que ocupa un día específico
+  const getSegmentForDay = (dayNumber: number) => {
+    return segments.find(segment => 
+      dayNumber >= segment.startDay && dayNumber <= segment.endDay
+    )
   }
 
-  const generateRecommendations = async (location: TripLocation) => {
-    if (!user) return
+  // Manejar inicio de selección
+  const handleSelectionStart = (dayNumber: number, event: React.MouseEvent) => {
+    if (!canEdit) return
+    
+    event.preventDefault()
+    
+    // Si el día ya está ocupado, no permitir selección
+    if (isDayOccupied(dayNumber)) return
+    
+    setIsSelecting(true)
+    setSelectionStart(dayNumber)
+    setSelectionEnd(dayNumber)
+    setDragPreview({ start: dayNumber, end: dayNumber })
+  }
 
-    setGeneratingRecommendations(prev => new Set(Array.from(prev).concat(location.id)))
-
-    // Generate in background without blocking UI
-    try {
-      const response = await fetch('/api/generate-recommendations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tripLocationId: location.id,
-          location: location.location,
-          city: location.city,
-          country: location.country,
-          tripTitle: tripTitle,
-          date: location.date,
-          notes: location.notes
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to generate recommendations')
-
-      const data = await response.json()
-      
-      // Update recommendations state
-      setRecommendations(prev => ({
-        ...prev,
-        [location.id]: data.recommendations
-      }))
-
-      // Update seasonal note if provided
-      if (data.seasonal_note) {
-        setSeasonalNotes(prev => ({
-          ...prev,
-          [location.id]: data.seasonal_note
-        }))
+  // Manejar movimiento durante selección
+  const handleSelectionMove = (dayNumber: number) => {
+    if (!isSelecting || !selectionStart) return
+    
+    const start = Math.min(selectionStart, dayNumber)
+    const end = Math.max(selectionStart, dayNumber)
+    
+    // Verificar que el rango no incluya días ocupados
+    let validRange = true
+    for (let i = start; i <= end; i++) {
+      if (isDayOccupied(i)) {
+        validRange = false
+        break
       }
-
-    } catch (error) {
-      console.error('Error generating recommendations:', error)
-    } finally {
-      setGeneratingRecommendations(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(location.id)
-        return newSet
-      })
+    }
+    
+    if (validRange) {
+      setSelectionEnd(dayNumber)
+      setDragPreview({ start, end })
     }
   }
 
-  const generateBulkRecommendations = async () => {
-    if (!user || !bulkGeneration.startDate || !bulkGeneration.endDate || !bulkGeneration.location) {
-      alert('Por favor completa todos los campos requeridos')
+  // Finalizar selección
+  const handleSelectionEnd = () => {
+    if (!isSelecting || !selectionStart || !selectionEnd) {
+      setIsSelecting(false)
+      setSelectionStart(null)
+      setSelectionEnd(null)
+      setDragPreview(null)
       return
     }
+    
+    const start = Math.min(selectionStart, selectionEnd)
+    const end = Math.max(selectionStart, selectionEnd)
+    
+    // Crear nuevo segmento
+    createSegment(start, end)
+    
+    setIsSelecting(false)
+    setSelectionStart(null)
+    setSelectionEnd(null)
+    setDragPreview(null)
+  }
 
-    setGeneratingBulk(true)
+  // Crear nuevo segmento
+  const createSegment = (startDay: number, endDay: number) => {
+    const segmentDays = allDays.filter(day => 
+      day.dayNumber >= startDay && day.dayNumber <= endDay
+    )
+    
+    const newSegment: LocationSegment = {
+      id: `segment-${Date.now()}`,
+      startDay,
+      endDay,
+      location: '',
+      city: '',
+      country: '',
+      notes: '',
+      days: segmentDays,
+      isConfigured: false,
+      tripLocationIds: [],
+      color: segmentColors[segments.length % segmentColors.length]
+    }
+    
+    setSegments(prev => [...prev, newSegment])
+  }
+
+  // Eliminar segmento
+  const deleteSegment = async (segmentId: string) => {
+    const segment = segments.find(s => s.id === segmentId)
+    if (!segment) return
 
     try {
-      // Generate date range
-      const start = new Date(bulkGeneration.startDate)
-      const end = new Date(bulkGeneration.endDate)
-      const dates: string[] = []
-      
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        dates.push(new Date(d).toISOString().split('T')[0])
+      // Eliminar ubicaciones de la base de datos
+      if (segment.tripLocationIds.length > 0) {
+        await supabase
+          .from('trip_locations')
+          .delete()
+          .in('id', segment.tripLocationIds)
       }
 
-      // Check which dates already have locations
-      const existingDates = new Set(locations.map(loc => loc.date))
-      const newDates = dates.filter(date => !existingDates.has(date))
-      const existingLocationsForDates = locations.filter(loc => dates.includes(loc.date))
-
-      // Create locations only for new dates
-      const newLocations = []
-      if (newDates.length > 0) {
-        const locationPromises = newDates.map(async (date) => {
-          const { data, error } = await supabase
-            .from('trip_locations')
-            .insert({
-              trip_id: tripId,
-              date: date,
-              location: bulkGeneration.location,
-              city: bulkGeneration.city || null,
-              country: bulkGeneration.country || null,
-              notes: bulkGeneration.notes || null,
-              created_by: user.id
-            })
-            .select()
-            .single()
-
-          if (error) throw error
-          return data
+      // Eliminar del estado
+      setSegments(prev => prev.filter(s => s.id !== segmentId))
+      
+      // Limpiar recomendaciones
+      segment.tripLocationIds.forEach(locationId => {
+        setRecommendations(prev => {
+          const updated = { ...prev }
+          delete updated[locationId]
+          return updated
         })
-
-        const createdLocations = await Promise.all(locationPromises)
-        newLocations.push(...createdLocations)
-        
-        // Update locations state with new locations
-        setLocations(prev => [...prev, ...createdLocations])
-      }
-
-      // Show success message
-      const totalCreated = newLocations.length
-      const totalExisting = existingLocationsForDates.length
-      
-      let message = ''
-      if (totalCreated > 0 && totalExisting > 0) {
-        message = `Se crearon ${totalCreated} nuevas ubicaciones y se encontraron ${totalExisting} existentes. Ahora puedes generar recomendaciones individualmente desde cada tarjeta.`
-      } else if (totalCreated > 0) {
-        message = `Se crearon ${totalCreated} nuevas ubicaciones. Ahora puedes generar recomendaciones individualmente desde cada tarjeta.`
-      } else {
-        message = `Se encontraron ${totalExisting} ubicaciones existentes para estas fechas. Puedes generar recomendaciones desde cada tarjeta.`
-      }
-      
-      alert(message)
-
-      // Reset form and close dialog
-      setBulkGeneration({
-        startDate: '',
-        endDate: '',
-        location: '',
-        city: '',
-        country: '',
-        notes: ''
       })
-      setShowBulkGenerationDialog(false)
 
     } catch (error) {
-      console.error('Error generating bulk recommendations:', error)
-      alert('Error al generar recomendaciones en lote. Por favor, intenta de nuevo.')
-    } finally {
-      setGeneratingBulk(false)
+      console.error('Error deleting segment:', error)
     }
   }
 
-  const toggleLocationExpansion = (locationId: string) => {
-    setExpandedLocations(prev => {
+  // Actualizar segmento
+  const updateSegment = (segmentId: string, field: keyof LocationSegment, value: string) => {
+    setSegments(prev => prev.map(segment => 
+      segment.id === segmentId 
+        ? { ...segment, [field]: value, isConfigured: false }
+        : segment
+    ))
+  }
+
+  // Guardar segmento
+  const saveSegment = async (segmentId: string) => {
+    const segment = segments.find(s => s.id === segmentId)
+    if (!segment || !segment.location.trim()) return
+
+    try {
+      // Eliminar ubicaciones existentes para este segmento
+      if (segment.tripLocationIds.length > 0) {
+        await supabase
+          .from('trip_locations')
+          .delete()
+          .in('id', segment.tripLocationIds)
+      }
+
+      // Crear nuevas ubicaciones para cada día del segmento
+      const locationPromises = segment.days.map(day => 
+        supabase
+          .from('trip_locations')
+          .insert({
+            trip_id: tripId,
+            date: day.date,
+            location: segment.location,
+            city: segment.city || null,
+            country: segment.country || null,
+            notes: segment.notes || null,
+            created_by: user?.id || ''
+          })
+          .select()
+          .single()
+      )
+
+      const results = await Promise.all(locationPromises)
+      const newLocationIds = results.map(result => result.data?.id).filter(Boolean) as string[]
+
+      // Actualizar segmento
+      setSegments(prev => prev.map(s => 
+        s.id === segmentId 
+          ? { ...s, isConfigured: true, tripLocationIds: newLocationIds }
+          : s
+      ))
+
+    } catch (error) {
+      console.error('Error saving segment:', error)
+    }
+  }
+
+  // Generar recomendaciones para todos los segmentos
+  const generateAllRecommendations = async () => {
+    setIsGeneratingAll(true)
+    try {
+      // Generar recomendaciones solo para segmentos configurados que no las tengan
+      const segmentsToGenerate = segments.filter(segment => 
+        segment.isConfigured && !recommendations[segment.id]
+      )
+      
+      for (const segment of segmentsToGenerate) {
+        await generateSegmentRecommendations(segment.id)
+      }
+    } catch (error) {
+      console.error('Error generating all recommendations:', error)
+    } finally {
+      setIsGeneratingAll(false)
+    }
+  }
+
+  // Toggle expansión de segmento
+  const toggleSegmentExpansion = (segmentId: string) => {
+    setExpandedSegments(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(locationId)) {
-        newSet.delete(locationId)
+      if (newSet.has(segmentId)) {
+        newSet.delete(segmentId)
       } else {
-        newSet.add(locationId)
+        newSet.add(segmentId)
       }
       return newSet
     })
   }
 
-  const toggleGroupExpansion = (groupKey: string) => {
-    const groupLocations = locationGroups[groupKey] || []
-    const allExpanded = groupLocations.every(loc => expandedLocations.has(loc.id))
-    
-    setExpandedLocations(prev => {
+  const toggleSegmentEditing = (segmentId: string) => {
+    setEditingSegments(prev => {
       const newSet = new Set(prev)
-      groupLocations.forEach(loc => {
-        if (allExpanded) {
-          newSet.delete(loc.id)
-        } else {
-          newSet.add(loc.id)
-        }
-      })
+      if (newSet.has(segmentId)) {
+        newSet.delete(segmentId)
+      } else {
+        newSet.add(segmentId)
+      }
       return newSet
     })
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
-
-  const formatDateShort = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    })
-  }
-
-  const getPriceLevel = (level: number | null) => {
-    if (!level) return ''
-    return '€'.repeat(level)
-  }
-
+  // Componente para renderizar estrellas de rating
   const getRatingStars = (rating: number | null) => {
     if (!rating) return null
     return (
@@ -440,246 +520,103 @@ export function TripAIRecommendations({
     )
   }
 
-  const renderLocationContent = (location: TripLocation) => {
-    const isEditing = editingLocation === location.id
-    const locationRecommendations = recommendations[location.id] || []
-    const isGenerating = generatingRecommendations.has(location.id)
+  // Obtener nivel de precio
+  const getPriceLevel = (level: number | null) => {
+    if (!level) return ''
+    return '€'.repeat(level)
+  }
 
-    return (
-      <div className="space-y-4">
-        {isEditing ? (
-          <div className="space-y-3 border-t pt-4">
-            <Input
-              value={location.location}
-              onChange={(e) => setLocations(prev => 
-                prev.map(loc => loc.id === location.id 
-                  ? { ...loc, location: e.target.value }
-                  : loc
-                )
-              )}
-              placeholder="Ubicación"
-            />
-            <div className="flex gap-2">
-              <Input
-                value={location.city || ''}
-                onChange={(e) => setLocations(prev => 
-                  prev.map(loc => loc.id === location.id 
-                    ? { ...loc, city: e.target.value }
-                    : loc
-                  )
-                )}
-                placeholder="Ciudad"
-                className="flex-1"
-              />
-              <Input
-                value={location.country || ''}
-                onChange={(e) => setLocations(prev => 
-                  prev.map(loc => loc.id === location.id 
-                    ? { ...loc, country: e.target.value }
-                    : loc
-                  )
-                )}
-                placeholder="País"
-                className="flex-1"
-              />
-            </div>
-            <Textarea
-              value={location.notes || ''}
-              onChange={(e) => setLocations(prev => 
-                prev.map(loc => loc.id === location.id 
-                  ? { ...loc, notes: e.target.value }
-                  : loc
-                )
-              )}
-              placeholder="Notas"
-            />
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => updateLocation(location.id, {
-                  location: location.location,
-                  city: location.city,
-                  country: location.country,
-                  notes: location.notes
-                })}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Guardar
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setEditingLocation(null)
-                  fetchLocations() // Reset changes
-                }}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {location.notes && (
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {location.notes}
-              </p>
-            )}
-            
-            {locationRecommendations.length > 0 ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Recomendaciones</h4>
-                  {canEdit && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => generateRecommendations(location)}
-                      disabled={isGenerating}
-                    >
-                      {isGenerating ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-4 w-4 mr-2" />
-                      )}
-                      Regenerar
-                    </Button>
-                  )}
-                </div>
-                
-                {seasonalNotes[location.id] && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-amber-800 dark:text-amber-200">
-                        <strong>Aviso temporal:</strong> {seasonalNotes[location.id]}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                <Tabs defaultValue="restaurants" className="w-full" data-tutorial="recommendation-tabs">
-                  <TabsList className="grid w-full grid-cols-6">
-                    {Object.entries(categoryNames).map(([key, name]) => (
-                      <TabsTrigger key={key} value={key} className="text-xs">
-                        {name}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                  
-                  {Object.entries(categoryNames).map(([category, categoryName]) => {
-                    const categoryRecs = locationRecommendations.filter(rec => rec.category === category)
-                    const IconComponent = categoryIcons[category as keyof typeof categoryIcons]
-                    
-                    return (
-                      <TabsContent key={category} value={category} className="mt-4">
-                        <div className="space-y-3">
-                          {categoryRecs.length > 0 ? (
-                            categoryRecs.map((rec) => (
-                              <div 
-                                key={rec.id} 
-                                className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
-                                onClick={() => {
-                                  if (rec.website) {
-                                    window.open(rec.website, '_blank', 'noopener,noreferrer')
-                                  }
-                                }}
-                              >
-                                <div className="flex items-start justify-between mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <IconComponent className="h-4 w-4 text-gray-500" />
-                                    <h5 className="font-medium">{rec.title}</h5>
-                                    {rec.price_level && (
-                                      <span className="text-sm text-gray-500">
-                                        {getPriceLevel(rec.price_level)}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {rec.rating && getRatingStars(rec.rating)}
-                                    {rec.website && (
-                                      <ExternalLink className="h-4 w-4 text-gray-400" />
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {rec.description && (
-                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                    {rec.description}
-                                  </p>
-                                )}
-                                
-                                <div className="space-y-1 text-xs text-gray-500">
-                                  {rec.address && (
-                                    <div className="flex items-center gap-1">
-                                      <MapPin className="h-3 w-3" />
-                                      <span>{rec.address}</span>
-                                    </div>
-                                  )}
-                                  {rec.opening_hours && (
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      <span>{rec.opening_hours}</span>
-                                    </div>
-                                  )}
-                                  {rec.phone && (
-                                    <div className="flex items-center gap-1">
-                                      <Phone className="h-3 w-3" />
-                                      <span>{rec.phone}</span>
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                {rec.recommendation_reason && (
-                                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
-                                    <strong>Por qué lo recomendamos:</strong> {rec.recommendation_reason}
-                                  </div>
-                                )}
-                              </div>
-                            ))
-                          ) : (
-                            <div className="text-center py-8 text-gray-500">
-                              <IconComponent className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                              <p>No hay recomendaciones de {categoryName.toLowerCase()}</p>
-                            </div>
-                          )}
-                        </div>
-                      </TabsContent>
-                    )
-                  })}
-                </Tabs>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                {isGenerating ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
-                    <p className="text-sm text-gray-600">Generando recomendaciones...</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-4">
-                    <Sparkles className="h-12 w-12 text-gray-400" />
-                    <div>
-                      <h4 className="font-medium mb-1">Sin recomendaciones</h4>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Genera recomendaciones personalizadas con IA para este día
-                      </p>
-                      {canEdit && (
-                        <Button onClick={() => generateRecommendations(location)} data-tutorial="generate-recommendations">
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Generar Recomendaciones
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+  // Generar recomendaciones para un segmento específico
+  const generateSegmentRecommendations = async (segmentId: string) => {
+    const segment = segments.find(s => s.id === segmentId)
+    if (!segment || !segment.isConfigured) return
+
+    // Evitar duplicados - verificar si ya tiene recomendaciones
+    const existingRecommendations = segment.tripLocationIds.flatMap(id => 
+      recommendations[id] || []
     )
+    
+    if (existingRecommendations.length > 0) {
+      console.log(`Segmento ${segmentId} ya tiene ${existingRecommendations.length} recomendaciones, saltando`)
+      return
+    }
+
+    setGeneratingRecommendations(prev => {
+      const newSet = new Set(prev)
+      newSet.add(segmentId)
+      return newSet
+    })
+    
+    try {
+      const response = await fetch('/api/generate-recommendations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tripId,
+          segmentId,
+          location: segment.location,
+          city: segment.city,
+          country: segment.country,
+          startDay: segment.startDay,
+          endDay: segment.endDay,
+          notes: segment.notes,
+          tripTitle,
+          startDate,
+          endDate
+        })
+      })
+
+      if (!response.ok) throw new Error('Error generando recomendaciones')
+
+      const data = await response.json()
+      
+      // Actualizar recomendaciones para cada tripLocationId del segmento
+      setRecommendations(prev => {
+        const newRecommendations = { ...prev }
+        // Distribuir las recomendaciones entre todos los tripLocationIds del segmento
+        segment.tripLocationIds.forEach(locationId => {
+          newRecommendations[locationId] = data.recommendations || []
+        })
+        return newRecommendations
+      })
+
+      if (data.seasonalNote) {
+        setSeasonalNotes(prev => ({
+          ...prev,
+          [segmentId]: data.seasonalNote
+        }))
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    } finally {
+      setGeneratingRecommendations(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(segmentId)
+        return newSet
+      })
+    }
+  }
+
+  // Obtener todas las recomendaciones de un segmento agrupadas por categoría
+  const getSegmentRecommendationsByCategory = (segmentId: string) => {
+    // Encontrar el segmento por ID
+    const segment = segments.find(s => s.id === segmentId)
+    if (!segment) return {}
+    
+    // Obtener todas las recomendaciones de todos los tripLocationIds del segmento
+    const segmentRecommendations = segment.tripLocationIds.flatMap(locationId => 
+      recommendations[locationId] || []
+    )
+    
+    // Debug: logs de recomendaciones si es necesario
+    
+    const grouped: { [key: string]: AIRecommendation[] } = {}
+    
+    Object.keys(categoryNames).forEach(category => {
+      grouped[category] = segmentRecommendations.filter(rec => rec.category === category)
+    })
+    
+    return grouped
   }
 
   if (loading) {
@@ -690,335 +627,459 @@ export function TripAIRecommendations({
     )
   }
 
+  const allSegmentsConfigured = segments.length > 0 && segments.every(s => s.isConfigured)
+  const configuredSegments = segments.filter(s => s.isConfigured).length
+  const totalDaysInSegments = segments.reduce((total, segment) => total + segment.days.length, 0)
+  const unassignedDays = allDays.length - totalDaysInSegments
+
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card data-tutorial="ai-header">
+        <CardHeader>
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-500" />
+              <Sparkles className="h-5 w-5 text-purple-600" />
               Recomendaciones con IA
             </CardTitle>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Especifica dónde estarás cada día y obtén recomendaciones personalizadas con inteligencia artificial.
+              Selecciona y arrastra para crear segmentos de días por ubicación. Luego obtén recomendaciones personalizadas.
             </p>
           </div>
-          {canEdit && (
+          {canEdit && allSegmentsConfigured && (
             <div className="flex gap-2">
-              <Dialog open={showBulkGenerationDialog} onOpenChange={setShowBulkGenerationDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" data-tutorial="location-form">
+              <Button 
+                onClick={generateAllRecommendations}
+                disabled={isGeneratingAll}
+                data-tutorial="generate-recommendations"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              >
+                {isGeneratingAll ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generando recomendaciones...
+                  </>
+                ) : (
+                  <>
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Generar Rango
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Generar Recomendaciones por Rango</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label htmlFor="startDate">Fecha Inicio</Label>
-                        <Input
-                          id="startDate"
-                          type="date"
-                          value={bulkGeneration.startDate}
-                          onChange={(e) => setBulkGeneration(prev => ({ ...prev, startDate: e.target.value }))}
-                          min={startDate || undefined}
-                          max={endDate || undefined}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="endDate">Fecha Fin</Label>
-                        <Input
-                          id="endDate"
-                          type="date"
-                          value={bulkGeneration.endDate}
-                          onChange={(e) => setBulkGeneration(prev => ({ ...prev, endDate: e.target.value }))}
-                          min={bulkGeneration.startDate || startDate || undefined}
-                          max={endDate || undefined}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="bulkLocation">Ubicación Base</Label>
-                      <Input
-                        id="bulkLocation"
-                        placeholder="ej. Nueva York, París..."
-                        value={bulkGeneration.location}
-                        onChange={(e) => setBulkGeneration(prev => ({ ...prev, location: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="bulkCity">Ciudad (opcional)</Label>
-                      <Input
-                        id="bulkCity"
-                        placeholder="ej. Nueva York"
-                        value={bulkGeneration.city}
-                        onChange={(e) => setBulkGeneration(prev => ({ ...prev, city: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="bulkCountry">País (opcional)</Label>
-                      <Input
-                        id="bulkCountry"
-                        placeholder="ej. Estados Unidos"
-                        value={bulkGeneration.country}
-                        onChange={(e) => setBulkGeneration(prev => ({ ...prev, country: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="bulkNotes">Preferencias (opcional)</Label>
-                      <Textarea
-                        id="bulkNotes"
-                        placeholder="Tipo de comida, presupuesto, intereses..."
-                        value={bulkGeneration.notes}
-                        onChange={(e) => setBulkGeneration(prev => ({ ...prev, notes: e.target.value }))}
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={generateBulkRecommendations} 
-                        disabled={!bulkGeneration.startDate || !bulkGeneration.endDate || !bulkGeneration.location || generatingBulk}
-                        data-tutorial="generate-recommendations"
-                      >
-                        {generatingBulk ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Generando...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            Generar Todo
-                          </>
-                        )}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => {
-                          setShowBulkGenerationDialog(false)
-                          setBulkGeneration({
-                            startDate: '',
-                            endDate: '',
-                            location: '',
-                            city: '',
-                            country: '',
-                            notes: ''
-                          })
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                    Generar Todas las Recomendaciones
+                  </>
+                )}
+              </Button>
             </div>
           )}
         </CardHeader>
         <CardContent>
-          {locations.length === 0 ? (
+          {!startDate || !endDate ? (
             <div className="text-center py-12">
-              <MapPin className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No hay ubicaciones definidas</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                {canEdit 
-                  ? "Agrega las ubicaciones donde estarás cada día para obtener recomendaciones personalizadas."
-                  : "El organizador del viaje aún no ha agregado ubicaciones por día."
-                }
+              <Calendar className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Fechas del viaje no definidas</h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Define las fechas de inicio y fin del viaje para poder organizar los días.
               </p>
             </div>
           ) : (
             <div className="space-y-6">
-              {Object.entries(locationGroups).map(([groupKey, groupLocations]) => {
-                const isGrouped = groupLocations.length > 1
-                const firstLocation = groupLocations[0]
-                const allGenerating = groupLocations.some(loc => generatingRecommendations.has(loc.id))
-                const hasRecommendations = groupLocations.some(loc => recommendations[loc.id]?.length > 0)
+              {/* Información del progreso */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4" data-tutorial="progress-info">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+                    Tu viaje: {allDays.length} días, {segments.length} segmentos
+                  </h3>
+                </div>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Haz clic y arrastra sobre los días para crear segmentos de ubicación.
+                </p>
+                <div className="flex items-center gap-4 mt-2">
+                  {configuredSegments > 0 && (
+                    <Badge variant="secondary" className={
+                      allSegmentsConfigured 
+                        ? "bg-green-100 text-green-800" 
+                        : "bg-yellow-100 text-yellow-800"
+                    }>
+                      {allSegmentsConfigured ? "✓" : "⏳"} {configuredSegments} de {segments.length} segmentos configurados
+                    </Badge>
+                  )}
+                  {unassignedDays > 0 && (
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+                      {unassignedDays} días sin asignar
+                    </Badge>
+                  )}
+                </div>
+              </div>
 
-                if (isGrouped) {
-                  // Render grouped locations
+              {/* Timeline visual de días con selección por arrastre */}
+              <div 
+                className="bg-white dark:bg-gray-800 border rounded-lg p-4 select-none" 
+                data-tutorial="timeline"
+                ref={timelineRef}
+                onMouseLeave={handleSelectionEnd}
+              >
+                <h4 className="font-medium mb-4 flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Timeline del Viaje - Selecciona y arrastra para crear segmentos
+                </h4>
+                <div className="grid grid-cols-7 gap-2 mb-4">
+                  {allDays.map((day) => {
+                    const isOccupied = isDayOccupied(day.dayNumber)
+                    const segment = getSegmentForDay(day.dayNumber)
+                    const isInDragPreview = dragPreview && 
+                      day.dayNumber >= dragPreview.start && 
+                      day.dayNumber <= dragPreview.end
+                    
+                    return (
+                      <div 
+                        key={day.date} 
+                        className={`relative p-2 text-center border rounded cursor-pointer transition-all ${
+                          isOccupied 
+                            ? `${segment?.color} bg-opacity-20 border-current text-gray-900 dark:text-gray-100`
+                            : isInDragPreview
+                            ? 'bg-blue-200 border-blue-400 dark:bg-blue-800 dark:border-blue-600'
+                            : 'border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                        onMouseDown={(e) => !isOccupied && handleSelectionStart(day.dayNumber, e)}
+                        onMouseEnter={() => handleSelectionMove(day.dayNumber)}
+                        onMouseUp={handleSelectionEnd}
+                      >
+                        <div className="text-xs font-medium">{day.dayName}</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">{day.formattedDate}</div>
+                        <div className="text-xs text-gray-500">Día {day.dayNumber}</div>
+                        
+                        {isOccupied && segment && (
+                          <div className="absolute top-0 right-0 -mt-1 -mr-1">
+                            <div className={`w-3 h-3 ${segment.color} rounded-full border border-white`} />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-gray-500 text-center">
+                  💡 Haz clic y arrastra desde el día inicial hasta el día final para crear un segmento
+                </p>
+              </div>
+
+              {/* Segmentos */}
+              <div className="space-y-4" data-tutorial="segments-area">
+                {segments.map((segment, segmentIndex) => {
+                  // Verificar si el segmento tiene recomendaciones buscando en todos los tripLocationIds
+                  const segmentRecommendations = segment.tripLocationIds.flatMap(locationId => 
+                    recommendations[locationId] || []
+                  )
+                  const hasRecommendations = segmentRecommendations.length > 0
+                  const isGenerating = generatingRecommendations.has(segment.id)
+                  const isEditing = editingSegments.has(segment.id)
+                  const isExpanded = expandedSegments.has(segment.id)
+                  
+                  // Debug: console.log para segmento si es necesario
+
                   return (
-                    <Card key={groupKey} className="border-l-4 border-l-blue-500">
-                      <Collapsible>
-                        <CollapsibleTrigger asChild>
-                          <CardHeader className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
-                                  <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                </div>
-                                <div>
-                                  <h3 className="text-lg font-semibold">{firstLocation.location}</h3>
-                                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                    {firstLocation.city && <Badge variant="secondary">{firstLocation.city}</Badge>}
-                                    {firstLocation.country && <Badge variant="outline">{firstLocation.country}</Badge>}
-                                    <span>• {groupLocations.length} días</span>
-                                    {allGenerating && <Badge variant="secondary" className="animate-pulse">Generando...</Badge>}
-                                    {hasRecommendations && <Badge variant="secondary" className="bg-green-100 text-green-800">✓ Con recomendaciones</Badge>}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {formatDateShort(groupLocations[0].date)} - {formatDateShort(groupLocations[groupLocations.length - 1].date)}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
+                    <Card 
+                      key={segment.id}
+                      className="border-l-4 transition-all duration-200"
+                      style={{ borderLeftColor: segment.color.replace('bg-', '#') }}
+                    >
+                      <div className="p-4">
+                        {/* Header clickeable para expandir/colapsar */}
+                        <div 
+                          className={`${
+                            hasRecommendations ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg -m-2 p-2 mb-1' : ''
+                          }`}
+                          onClick={() => {
+                            if (hasRecommendations) {
+                              toggleSegmentExpansion(segment.id)
+                            }
+                          }}
+                        >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className={`p-2 rounded-lg ${segment.color} bg-opacity-20`}
+                            >
+                              <MapPin className={`h-4 w-4 text-gray-700 dark:text-gray-300`} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold">
+                                Segmento {segmentIndex + 1}
+                                {segment.location && ` - ${segment.location}`}
+                              </h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Días {segment.startDay} al {segment.endDay} ({segment.days.length} días)
+                                {hasRecommendations && (
+                                  <span className="ml-2 text-purple-600 text-xs">
+                                    {isExpanded ? '▼ Click para ocultar' : '▶ Click para ver recomendaciones'}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {segment.isConfigured ? (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                <Check className="h-3 w-3 mr-1" />
+                                Configurado
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                                ⏳ Pendiente
+                              </Badge>
+                            )}
+                            {hasRecommendations && (
+                              <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                                ✨ Con recomendaciones
+                              </Badge>
+                            )}
+                            {isGenerating && (
+                              <Badge variant="secondary" className="animate-pulse">
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Generando...
+                              </Badge>
+                            )}
+                            
+                            {/* Botones de acción - con stopPropagation para evitar expandir */}
+                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                              {canEdit && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    toggleGroupExpansion(groupKey)
-                                  }}
-                                  className="text-xs"
+                                  onClick={() => toggleSegmentEditing(segment.id)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                 >
-                                  {groupLocations.every(loc => expandedLocations.has(loc.id)) ? 'Colapsar Todo' : 'Expandir Todo'}
+                                  {isEditing ? 'Cancelar' : 'Editar'}
                                 </Button>
-                                {canEdit && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      groupLocations.forEach(loc => generateRecommendations(loc))
-                                    }}
-                                    disabled={allGenerating}
-                                  >
-                                    {allGenerating ? (
-                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    ) : (
-                                      <Sparkles className="h-4 w-4 mr-2" />
-                                    )}
-                                    Generar Todas
-                                  </Button>
-                                )}
-                                <ChevronDown className="h-4 w-4" />
-                              </div>
+                              )}
+                              
+                              {segment.isConfigured && !hasRecommendations && canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => generateSegmentRecommendations(segment.id)}
+                                  disabled={isGenerating}
+                                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                >
+                                  {isGenerating ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                              
+                              {canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteSegment(segment.id)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
-                          </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="px-6 pb-6 space-y-4">
-                            {groupLocations.map((location, index) => (
-                              <div key={location.id} className="border rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                                <Collapsible open={expandedLocations.has(location.id)} onOpenChange={() => toggleLocationExpansion(location.id)}>
-                                  <CollapsibleTrigger asChild>
-                                    <div className="p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-t-lg">
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                          <Calendar className="h-4 w-4 text-gray-500" />
-                                          <span className="font-medium">Día {index + 1}</span>
-                                          <span className="text-sm text-gray-600">{formatDate(location.date)}</span>
-                                          {generatingRecommendations.has(location.id) && (
-                                            <Badge variant="secondary" className="animate-pulse">
-                                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                              Generando...
-                                            </Badge>
-                                          )}
-                                          {recommendations[location.id]?.length > 0 && (
-                                            <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                              ✓ {recommendations[location.id].length} recomendaciones
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                          {canEdit && (
-                                            <>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={(e) => {
-                                                  e.stopPropagation()
-                                                  setEditingLocation(editingLocation === location.id ? null : location.id)
-                                                }}
-                                              >
-                                                <Edit className="h-3 w-3" />
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={(e) => {
-                                                  e.stopPropagation()
-                                                  deleteLocation(location.id)
-                                                }}
-                                              >
-                                                <Trash2 className="h-3 w-3 text-red-600" />
-                                              </Button>
-                                            </>
-                                          )}
-                                          <ChevronDown className="h-4 w-4 text-gray-400" />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="px-4 pb-4 border-t border-gray-200 dark:border-gray-600">
-                                      {renderLocationContent(location)}
-                                    </div>
-                                  </CollapsibleContent>
-                                </Collapsible>
-                              </div>
-                            ))}
                           </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </Card>
-                  )
-                } else {
-                  // Render single location
-                  const location = groupLocations[0]
-                  return (
-                    <Card key={location.id} className="border-l-4 border-l-purple-500">
-                      <Collapsible open={expandedLocations.has(location.id)} onOpenChange={() => toggleLocationExpansion(location.id)}>
-                        <CollapsibleTrigger asChild>
-                          <CardHeader className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-lg">
-                                  <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                </div>
-                                <div>
-                                  <h3 className="text-lg font-semibold">{formatDate(location.date)}</h3>
-                                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                    <MapPin className="h-3 w-3" />
-                                    <span>{location.location}</span>
-                                    {location.city && <Badge variant="secondary">{location.city}</Badge>}
-                                    {location.country && <Badge variant="outline">{location.country}</Badge>}
-                                    {generatingRecommendations.has(location.id) && <Badge variant="secondary" className="animate-pulse">Generando...</Badge>}
-                                    {recommendations[location.id]?.length > 0 && <Badge variant="secondary" className="bg-green-100 text-green-800">✓ Recomendaciones</Badge>}
-                                  </div>
-                                </div>
+                        </div>
+                        </div>
+                        {/* Fin del header clickeable */}
+
+                        {/* Formulario de edición */}
+                        {isEditing && (
+                          <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <Label htmlFor={`location-${segment.id}`}>Ubicación principal *</Label>
+                                <Input
+                                  id={`location-${segment.id}`}
+                                  placeholder="ej. París, Manhattan, Centro Histórico"
+                                  value={segment.location}
+                                  onChange={(e) => updateSegment(segment.id, 'location', e.target.value)}
+                                />
                               </div>
-                              <div className="flex items-center gap-2">
-                                {canEdit && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setEditingLocation(editingLocation === location.id ? null : location.id)
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                <ChevronDown className="h-4 w-4" />
+                              <div>
+                                <Label htmlFor={`city-${segment.id}`}>Ciudad</Label>
+                                <Input
+                                  id={`city-${segment.id}`}
+                                  placeholder="ej. París, Nueva York"
+                                  value={segment.city}
+                                  onChange={(e) => updateSegment(segment.id, 'city', e.target.value)}
+                                />
                               </div>
                             </div>
-                          </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <CardContent>
-                            {renderLocationContent(location)}
-                          </CardContent>
-                        </CollapsibleContent>
-                      </Collapsible>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <Label htmlFor={`country-${segment.id}`}>País</Label>
+                                <Input
+                                  id={`country-${segment.id}`}
+                                  placeholder="ej. Francia"
+                                  value={segment.country}
+                                  onChange={(e) => updateSegment(segment.id, 'country', e.target.value)}
+                                />
+                              </div>
+                              <div className="flex items-end">
+                                <Button
+                                  onClick={() => {
+                                    saveSegment(segment.id)
+                                    toggleSegmentEditing(segment.id)
+                                  }}
+                                  disabled={!segment.location.trim()}
+                                  className="w-full"
+                                >
+                                  <Check className="h-4 w-4 mr-2" />
+                                  {segment.isConfigured ? 'Actualizar' : 'Configurar'} Segmento
+                                </Button>
+                              </div>
+                            </div>
+                            <div>
+                              <Label htmlFor={`notes-${segment.id}`}>Preferencias (opcional)</Label>
+                              <Textarea
+                                id={`notes-${segment.id}`}
+                                placeholder="ej. Comida local, museos, vida nocturna..."
+                                value={segment.notes}
+                                onChange={(e) => updateSegment(segment.id, 'notes', e.target.value)}
+                                rows={2}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Mostrar recomendaciones agrupadas por categoría con animación */}
+                        {hasRecommendations && (
+                          <div 
+                            className={`border-t mt-4 overflow-hidden transition-all duration-300 ease-in-out ${
+                              isExpanded ? 'max-h-[2000px] pt-4 opacity-100' : 'max-h-0 pt-0 opacity-0'
+                            }`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {seasonalNotes[segment.id] && (
+                              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg mb-4">
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                                    <strong>Aviso temporal:</strong> {seasonalNotes[segment.id]}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            <Tabs defaultValue="restaurants" className="w-full" data-tutorial="recommendation-tabs">
+                              <TabsList className="grid w-full grid-cols-6" onClick={(e) => e.stopPropagation()}>
+                                {Object.entries(categoryNames).map(([key, name]) => (
+                                  <TabsTrigger 
+                                    key={key} 
+                                    value={key} 
+                                    className="text-xs"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {name}
+                                  </TabsTrigger>
+                                ))}
+                              </TabsList>
+                              
+                              {Object.entries(categoryNames).map(([category, categoryName]) => {
+                                const categoryRecommendations = getSegmentRecommendationsByCategory(segment.id)[category] || []
+                                const IconComponent = categoryIcons[category as keyof typeof categoryIcons]
+                                
+                                return (
+                                  <TabsContent 
+                                    key={category} 
+                                    value={category} 
+                                    className="mt-4"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                                      {categoryRecommendations.length > 0 ? (
+                                        categoryRecommendations.map((rec) => (
+                                          <div 
+                                            key={rec.id} 
+                                            className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
+                                            onClick={() => {
+                                              if (rec.website) {
+                                                window.open(rec.website, '_blank', 'noopener,noreferrer')
+                                              }
+                                            }}
+                                          >
+                                            <div className="flex items-start justify-between mb-2">
+                                              <div className="flex items-center gap-2">
+                                                <IconComponent className="h-4 w-4 text-gray-500" />
+                                                <h5 className="font-medium">{rec.title}</h5>
+                                                {rec.price_level && (
+                                                  <span className="text-sm text-gray-500">
+                                                    {getPriceLevel(rec.price_level)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                {rec.rating && getRatingStars(rec.rating)}
+                                                {rec.website && (
+                                                  <ExternalLink className="h-4 w-4 text-gray-400" />
+                                                )}
+                                              </div>
+                                            </div>
+                                            
+                                            {rec.description && (
+                                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                                {rec.description}
+                                              </p>
+                                            )}
+                                            
+                                            {rec.recommendation_reason && (
+                                              <p className="text-xs text-blue-600 dark:text-blue-400 mb-2 italic">
+                                                💡 {rec.recommendation_reason}
+                                              </p>
+                                            )}
+                                            
+                                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                                              {rec.address && (
+                                                <div className="flex items-center gap-1">
+                                                  <MapPin className="h-3 w-3" />
+                                                  <span>{rec.address}</span>
+                                                </div>
+                                              )}
+                                              {rec.phone && (
+                                                <div className="flex items-center gap-1">
+                                                  <Phone className="h-3 w-3" />
+                                                  <span>{rec.phone}</span>
+                                                </div>
+                                              )}
+                                              {rec.opening_hours && (
+                                                <div className="flex items-center gap-1">
+                                                  <Clock className="h-3 w-3" />
+                                                  <span>{rec.opening_hours}</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="text-center py-8">
+                                          <IconComponent className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                                          <p className="text-gray-500">No hay recomendaciones de {categoryName.toLowerCase()} para este segmento</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </TabsContent>
+                                )
+                              })}
+                            </Tabs>
+                          </div>
+                        )}
+                      </div>
                     </Card>
                   )
-                }
-              })}
+                })}
+              </div>
+
+              {/* Botón para agregar segmento manualmente si quedan días sin asignar */}
+              {canEdit && unassignedDays > 0 && (
+                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                  <Plus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600 mb-4">
+                    Tienes {unassignedDays} días sin asignar a ningún segmento
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Selecciona y arrastra en el timeline para crear más segmentos
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -1026,4 +1087,5 @@ export function TripAIRecommendations({
     </div>
   )
 }
+ 
  
