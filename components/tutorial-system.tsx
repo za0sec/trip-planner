@@ -13,6 +13,7 @@ export type TutorialType =
   | "ai" 
   | "collaboration"
   | "summary"
+  | "expense-splitting"
 
 interface TutorialSystemProps {
   type: TutorialType
@@ -894,6 +895,21 @@ const tutorialSteps: { [key in TutorialType]: Step[] } = {
       placement: 'top',
     },
   ],
+  "expense-splitting": [
+    {
+      target: 'body',
+      content: (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-gray-900">División de Gastos 💰</h2>
+          <p className="text-gray-700">
+            Bienvenido al sistema de división de gastos tipo Splitwise. Aquí podrás gestionar fácilmente quién debe qué a quién en tu viaje.
+          </p>
+        </div>
+      ),
+      placement: 'center',
+      disableBeacon: true,
+    },
+  ],
 }
 
 export function TutorialSystem({ type, autoStart = true }: TutorialSystemProps) {
@@ -969,7 +985,7 @@ export function TutorialSystem({ type, autoStart = true }: TutorialSystemProps) 
 
   // Inicializar posición del spotlight cuando el tutorial comience
   useEffect(() => {
-    if (run && tutorialSteps[type].length > 0) {
+    if (run && tutorialSteps[type] && tutorialSteps[type].length > 0) {
       setTimeout(() => {
         const firstStep = tutorialSteps[type][0]
         const element = document.querySelector(firstStep.target as string)

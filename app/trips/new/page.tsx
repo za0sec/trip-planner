@@ -77,7 +77,7 @@ export default function NewTripPage() {
 
       // Create the trip with a simple insert (no RLS to worry about)
       const tripData = {
-        id: crypto.randomUUID(), // Generate UUID manually
+        id: crypto.randomUUID(), // Generate UUID 
         title: formData.title,
         description: formData.description || null,
         destination: formData.destination,

@@ -37,6 +37,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { AddItemDialog } from "@/components/add-item-dialog"
+import { SplitExistingCostDialog } from "@/components/split-existing-cost-dialog"
 import { TutorialSystem } from "@/components/tutorial-system"
 
 interface Trip {
@@ -138,46 +139,6 @@ const categoryPresentation = {
   default: { iconBg: "bg-gray-200 dark:bg-gray-700/30", iconColor: "text-gray-700 dark:text-gray-300", name: "Gasto" },
 }
 
-const expenseCategoryKeyMap: { [key: string]: keyof typeof categoryPresentation } = {
-  Vuelos: "flight",
-  Alojamiento: "accommodation",
-  Transporte: "transport",
-  Comida: "food",
-  Actividades: "activity",
-  Compras: "shopping",
-  Entradas: "activity",
-  Seguros: "other",
-  Visas: "other",
-  Equipaje: "transport",
-  "Internet/SIM": "other",
-  Propinas: "food",
-  "Otro (Gasto)": "other",
-}
-
-const statusConfig = {
-  planned: {
-    label: "Planificado",
-    color:
-      "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-700",
-  },
-  purchased: {
-    label: "Comprado",
-    color:
-      "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700",
-  },
-  refunded: {
-    label: "Reembolsado",
-    color: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700",
-  },
-  booked: {
-    label: "Reservado",
-    color: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
-  },
-  completed: {
-    label: "Completado",
-    color: "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-700",
-  },
-}
 
 export default function TripDetailPage() {
   const params = useParams()
@@ -189,6 +150,9 @@ export default function TripDetailPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("planning")
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [showSplitDialog, setShowSplitDialog] = useState(false)
+  const [selectedActivityToSplit, setSelectedActivityToSplit] = useState<Activity | null>(null)
+  const [dividedActivities, setDividedActivities] = useState<Set<string>>(new Set())
 
   const isOwner = () => trip?.created_by === user?.id
   const canEdit = () => isOwner() || (userRole?.role === "editor" && userRole?.status === "accepted")
@@ -241,11 +205,44 @@ export default function TripDetailPage() {
 
       const { data: expensesData } = await supabase.rpc("get_trip_expenses", { trip_uuid: tripId, user_uuid: userId })
       setExpenses(expensesData || [])
+
+      // Identificar qué actividades ya tienen gastos divididos
+      if (activitiesData && expensesData) {
+        const dividedActivityIds = new Set<string>()
+        
+        // Buscar gastos que correspondan a actividades divididas 
+        expensesData.forEach((expense: TripExpense) => {
+          if (expense.title) {
+            let originalTitle = null
+            
+            // Verificar si contiene "(Planificación)" o "(Dividido)"
+            if (expense.title.includes("(Planificación)")) {
+              originalTitle = expense.title.replace(" (Planificación)", "")
+            } else if (expense.title.includes("(Dividido)")) {
+              originalTitle = expense.title.replace(" (Dividido)", "")
+            }
+            
+            // Si encontramos un sufijo válido, buscar la actividad correspondiente
+            if (originalTitle) {
+              const matchingActivity = activitiesData.find((activity: Activity) => 
+                activity.title === originalTitle
+              )
+              
+              if (matchingActivity) {
+                dividedActivityIds.add(matchingActivity.id)
+              }
+            }
+          }
+        })
+        
+        setDividedActivities(dividedActivityIds)
+      }
     } catch (error) {
       console.error("Error fetching trip data:", error)
       setTrip(null)
       setActivities([])
       setExpenses([])
+      setDividedActivities(new Set())
     } finally {
       setLoading(false)
     }
@@ -263,16 +260,25 @@ export default function TripDetailPage() {
     }
   }
 
-  const deleteExpense = async (expenseId: string) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este gasto?")) return
-    try {
-      const { error } = await supabase.from("trip_expenses").delete().eq("id", expenseId) // Corrected table name
-      if (error) throw error
-      fetchTripData() // Refetch to update list
-    } catch (error) {
-      console.error("Error deleting expense:", error)
-      alert("Error al eliminar el gasto")
-    }
+  const handleSplitActivityCost = (activity: Activity) => {
+    setSelectedActivityToSplit(activity)
+    setShowSplitDialog(true)
+  }
+
+  const handleEditActivitySplit = (activity: Activity) => {
+    // Buscar qué tipo de gasto dividido existe para esta actividad
+    const expenseWithPlanificacion = `${activity.title} (Planificación)`
+    
+    // Usar (Planificación) por defecto, pero podríamos verificar cuál existe realmente
+    window.location.href = `/trips/${trip?.id}/expenses?highlight=${encodeURIComponent(expenseWithPlanificacion)}`
+  }
+
+  const handleSplitCreated = () => {
+    fetchTripData() // Refrescar datos para mostrar el nuevo gasto dividido
+  }
+
+  const isActivityDivided = (activityId: string) => {
+    return dividedActivities.has(activityId)
   }
 
   const formatCurrency = (amount: number | null, currency = "USD") => {
@@ -456,7 +462,7 @@ export default function TripDetailPage() {
             <Sparkles className="h-5 w-5 text-purple-500" />
             Herramientas Avanzadas
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Recomendaciones IA */}
             <Link href={`/trips/${trip.id}/ai-recommendations`}>
               <Button
@@ -472,6 +478,25 @@ export default function TripDetailPage() {
                 </div>
                 <span className="text-xs text-gray-500 dark:text-gray-400 text-left">
                   Sugerencias con inteligencia artificial
+                </span>
+              </Button>
+            </Link>
+
+            {/* División de Gastos */}
+            <Link href={`/trips/${trip.id}/expenses`}>
+              <Button
+                variant="outline"
+                className="w-full h-auto p-4 flex flex-col items-start gap-2 hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/10"
+                data-tutorial="expenses-splitting-card"
+              >
+                <div className="flex items-center gap-2 w-full">
+                  <div className="bg-orange-100 dark:bg-orange-900/30 p-1.5 rounded">
+                    <DollarSign className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <span className="font-medium text-sm">División de Gastos</span>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                  Balances y deudas tipo Splitwise
                 </span>
               </Button>
             </Link>
@@ -612,7 +637,14 @@ export default function TripDetailPage() {
                                     <div className="flex items-center gap-3">
                                       {activity.estimated_cost && (
                                         <div className="font-semibold text-md text-right">
-                                          {formatCurrency(activity.estimated_cost, trip.currency)}
+                                          <div className="flex items-center gap-2 justify-end">
+                                            {formatCurrency(activity.estimated_cost, trip.currency)}
+                                            {isActivityDivided(activity.id) && (
+                                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700">
+                                                Dividido
+                                              </Badge>
+                                            )}
+                                          </div>
                                           <p className="text-xs text-gray-500 dark:text-gray-400 font-normal">
                                             Estimado
                                           </p>
@@ -669,7 +701,34 @@ export default function TripDetailPage() {
                                       </Collapsible>
                                     )}
                                     {canEdit() && (activity.created_by === user?.id || isOwner()) && (
-                                      <div className="mt-3 text-right">
+                                      <div className="mt-3 text-right space-x-2">
+                                        {activity.estimated_cost && activity.estimated_cost > 0 && (
+                                          isActivityDivided(activity.id) ? (
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleEditActivitySplit(activity)
+                                              }}
+                                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/50 text-xs"
+                                            >
+                                              <PieChart className="h-3 w-3 mr-1" /> Editar División
+                                            </Button>
+                                          ) : (
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleSplitActivityCost(activity)
+                                              }}
+                                              className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/50 text-xs"
+                                            >
+                                              <PieChart className="h-3 w-3 mr-1" /> Dividir Costo
+                                            </Button>
+                                          )
+                                        )}
                                         <Button
                                           variant="ghost"
                                           size="sm"
@@ -735,7 +794,14 @@ export default function TripDetailPage() {
                                             <div className="flex items-center gap-3">
                                               {activity.estimated_cost && (
                                                 <div className="font-semibold text-md text-right">
-                                                  {formatCurrency(activity.estimated_cost, trip.currency)}
+                                                  <div className="flex items-center gap-2 justify-end">
+                                                    {formatCurrency(activity.estimated_cost, trip.currency)}
+                                                    {isActivityDivided(activity.id) && (
+                                                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700">
+                                                        Dividido
+                                                      </Badge>
+                                                    )}
+                                                  </div>
                                                   <p className="text-xs text-gray-500 dark:text-gray-400 font-normal">
                                                     Estimado
                                                   </p>
@@ -785,7 +851,34 @@ export default function TripDetailPage() {
                                               </Collapsible>
                                             )}
                                             {canEdit() && (activity.created_by === user?.id || isOwner()) && (
-                                              <div className="mt-3 text-right">
+                                              <div className="mt-3 text-right space-x-2">
+                                                {activity.estimated_cost && activity.estimated_cost > 0 && (
+                                                  isActivityDivided(activity.id) ? (
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleEditActivitySplit(activity)
+                                                      }}
+                                                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/50 text-xs"
+                                                    >
+                                                      <PieChart className="h-3 w-3 mr-1" /> Editar División
+                                                    </Button>
+                                                  ) : (
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleSplitActivityCost(activity)
+                                                      }}
+                                                      className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/50 text-xs"
+                                                    >
+                                                      <PieChart className="h-3 w-3 mr-1" /> Dividir Costo
+                                                    </Button>
+                                                  )
+                                                )}
                                                 <Button
                                                   variant="ghost"
                                                   size="sm"
@@ -807,130 +900,6 @@ export default function TripDetailPage() {
                               </div>
                             </div>
                           ))}
-                      </div>
-                    )}
-                    {expenses.length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-semibold mb-3 text-gray-700 dark:text-gray-300">
-                          💰 Gastos Generales Registrados
-                        </h3>
-                        <div className="space-y-3">
-                          {expenses.map((expense) => {
-                            const statusInfo = statusConfig[expense.status as keyof typeof statusConfig]
-                            const categoryKey = expense.category_name
-                              ? expenseCategoryKeyMap[expense.category_name] || "default"
-                              : "default"
-                            const pres = categoryPresentation[categoryKey]
-                            const IconComp = categoryIcons[categoryKey] || categoryIcons.default
-                            const imageUrl = expense.receipt_url || expense.image_url
-
-                            return (
-                              <Collapsible
-                                key={expense.id}
-                                className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm"
-                              >
-                                <CollapsibleTrigger className="w-full p-3 text-left group hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors rounded-t-lg data-[state=open]:rounded-b-none">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div className={`p-2 rounded-lg ${pres.iconBg}`}>
-                                        {expense.category_icon ? (
-                                          <span className={`text-xl ${pres.iconColor}`}>{expense.category_icon}</span>
-                                        ) : (
-                                          <IconComp className={`h-5 w-5 ${pres.iconColor}`} />
-                                        )}
-                                      </div>
-                                      <div>
-                                        <h4 className="font-semibold text-md">{expense.title}</h4>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                          {expense.category_name || "Gasto General"}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      <div className="font-semibold text-md text-right">
-                                        {formatCurrency(expense.amount, trip.currency)}
-                                        {statusInfo && (
-                                          <Badge variant="outline" className={`text-xs ml-2 ${statusInfo.color}`}>
-                                            {statusInfo.label}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <ChevronDown className="h-5 w-5 text-gray-400 dark:text-gray-500 group-data-[state=open]:rotate-180 transition-transform" />
-                                    </div>
-                                  </div>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent className="px-3 pt-2 pb-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-lg">
-                                  <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                                    {expense.description && (
-                                      <p>
-                                        <strong className="font-medium text-gray-600 dark:text-gray-400">
-                                          Descripción:
-                                        </strong>{" "}
-                                        {expense.description}
-                                      </p>
-                                    )}
-                                    {expense.location && (
-                                      <p>
-                                        <strong className="font-medium text-gray-600 dark:text-gray-400">Lugar:</strong>{" "}
-                                        {expense.location}
-                                      </p>
-                                    )}
-                                    {expense.purchase_date && (
-                                      <p>
-                                        <strong className="font-medium text-gray-600 dark:text-gray-400">
-                                          Fecha Compra:
-                                        </strong>{" "}
-                                        {formatDate(expense.purchase_date)}
-                                      </p>
-                                    )}
-                                    {expense.notes && (
-                                      <p>
-                                        <strong className="font-medium text-gray-600 dark:text-gray-400">Notas:</strong>{" "}
-                                        {expense.notes}
-                                      </p>
-                                    )}
-                                    {imageUrl && (
-                                      <Collapsible className="mt-3">
-                                        <CollapsibleTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-xs dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
-                                          >
-                                            <ImageIcon className="h-3 w-3 mr-1" /> Ver Recibo/Imagen
-                                          </Button>
-                                        </CollapsibleTrigger>
-                                        <CollapsibleContent className="mt-2">
-                                          <img
-                                            src={imageUrl || "/placeholder.svg"}
-                                            alt={`Recibo de ${expense.title}`}
-                                            className="rounded-lg max-w-full sm:max-w-xs max-h-48 object-contain border dark:border-gray-600"
-                                            loading="lazy"
-                                          />
-                                        </CollapsibleContent>
-                                      </Collapsible>
-                                    )}
-                                    {canEdit() && (expense.created_by === user?.id || isOwner()) && (
-                                      <div className="mt-3 text-right">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            deleteExpense(expense.id)
-                                          }}
-                                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/50 text-xs"
-                                        >
-                                          <Trash2 className="h-3 w-3 mr-1" /> Eliminar
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </CollapsibleContent>
-                              </Collapsible>
-                            )
-                          })}
-                        </div>
                       </div>
                     )}
                   </div>
@@ -1073,6 +1042,22 @@ export default function TripDetailPage() {
           tripStartDate={trip.start_date}
           tripEndDate={trip.end_date}
           onItemAdded={fetchTripData}
+        />
+      )}
+
+      {canEdit() && selectedActivityToSplit && selectedActivityToSplit.estimated_cost !== null && (
+        <SplitExistingCostDialog
+          open={showSplitDialog}
+          onOpenChange={setShowSplitDialog}
+          activity={{
+            id: selectedActivityToSplit.id,
+            title: selectedActivityToSplit.title,
+            description: selectedActivityToSplit.description,
+            estimated_cost: selectedActivityToSplit.estimated_cost
+          }}
+          tripId={trip.id}
+          tripCurrency={trip.currency}
+          onSplitCreated={handleSplitCreated}
         />
       )}
       <Footer />
