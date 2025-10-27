@@ -49,7 +49,12 @@ interface TripMemberData {
     email: string
     full_name: string | null
     avatar_url: string | null
-  }[] | null
+  }[] | {
+    id: string
+    email: string
+    full_name: string | null
+    avatar_url: string | null
+  } | null
 }
 
 interface ExpenseSplit {
@@ -144,6 +149,8 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
 
   const fetchTripMembers = async () => {
     try {
+      console.log("🔍 Fetching trip members for trip:", tripId)
+      
       // Obtener información del viaje y owner
       const { data: tripData, error: tripError } = await supabase
         .from("trips")
@@ -161,11 +168,35 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
         .single()
 
       if (tripError) {
-        console.error("Error fetching trip:", tripError)
+        console.error("❌ Error fetching trip:", tripError)
         return
       }
 
-      // Obtener miembros del viaje
+      console.log("✅ Trip data:", tripData)
+
+      // Obtener miembros del viaje (incluyendo TODOS los estados para debug)
+      const { data: allMembersData, error: allMembersError } = await supabase
+        .from("trip_members")
+        .select(`
+          user_id,
+          role,
+          status,
+          profiles!trip_members_user_id_fkey (
+            id,
+            email,
+            full_name,
+            avatar_url
+          )
+        `)
+        .eq("trip_id", tripId)
+
+      if (allMembersError) {
+        console.error("❌ Error fetching all trip members:", allMembersError)
+      } else {
+        console.log("📋 ALL trip members (all statuses):", allMembersData)
+      }
+
+      // Obtener solo miembros aceptados
       const { data: membersData, error: membersError } = await supabase
         .from("trip_members")
         .select(`
@@ -183,9 +214,11 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
         .eq("status", "accepted")
 
       if (membersError) {
-        console.error("Error fetching trip members:", membersError)
+        console.error("❌ Error fetching accepted trip members:", membersError)
         return
       }
+
+      console.log("✅ Accepted trip members:", membersData)
 
       // Combinar owner y miembros
       const allMembers: TripMember[] = []
@@ -200,25 +233,48 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
           avatar_url: ownerProfile.avatar_url,
           role: 'owner'
         })
+        console.log("✅ Added owner:", ownerProfile.email)
       }
 
       // Agregar miembros (evitando duplicar el owner)
       if (membersData) {
         membersData.forEach((member: TripMemberData) => {
-          if (member.user_id !== tripData.created_by && member.profiles && member.profiles.length > 0) {
-            const profile = member.profiles[0]
-            allMembers.push({
-              user_id: member.user_id,
-              email: profile.email,
-              full_name: profile.full_name,
-              avatar_url: profile.avatar_url,
-              role: member.role
-            })
+          console.log("🔍 Processing member:", member.user_id, "profiles:", member.profiles)
+          
+          // Skip if it's the owner
+          if (member.user_id === tripData.created_by) {
+            console.log("⏭️ Skipped member (is owner):", member.user_id)
+            return
           }
+          
+          // Check if profiles exists and get the profile object
+          if (!member.profiles) {
+            console.log("⚠️ Member has no profile:", member.user_id)
+            return
+          }
+          
+          // Handle both array and single object from Supabase
+          const profile = Array.isArray(member.profiles) 
+            ? (member.profiles.length > 0 ? member.profiles[0] : null)
+            : member.profiles
+          
+          if (!profile) {
+            console.log("⚠️ Could not get profile for member:", member.user_id)
+            return
+          }
+          
+          allMembers.push({
+            user_id: member.user_id,
+            email: profile.email,
+            full_name: profile.full_name,
+            avatar_url: profile.avatar_url,
+            role: member.role
+          })
+          console.log("✅ Added member:", profile.email)
         })
       }
 
-      console.log("🔍 Trip members loaded:", allMembers)
+      console.log("🎯 Final trip members loaded:", allMembers)
       setTripMembers(allMembers)
       
       // Por defecto, incluir a todos los miembros en la división
@@ -227,7 +283,7 @@ export function AddExpenseDialog({ open, onOpenChange, tripId, tripCurrency, onE
         setSelectedParticipants(allMemberIds)
       }
     } catch (error) {
-      console.error("Error fetching trip members:", error)
+      console.error("❌ Error fetching trip members:", error)
     }
   }
 
