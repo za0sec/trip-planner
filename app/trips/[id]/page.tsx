@@ -39,6 +39,7 @@ import Link from "next/link"
 import { AddItemDialog } from "@/components/add-item-dialog"
 import { SplitExistingCostDialog } from "@/components/split-existing-cost-dialog"
 import { TutorialSystem } from "@/components/tutorial-system"
+import { CurrencyConversions } from "@/components/currency-conversions"
 
 interface Trip {
   id: string
@@ -470,6 +471,11 @@ export default function TripDetailPage() {
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{stat.sub}</p>
+                {stat.title === "Costo Total" && trip.currency === "USD" && getTotalEstimatedCost() > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <CurrencyConversions usdAmount={getTotalEstimatedCost()} showTitle={false} />
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

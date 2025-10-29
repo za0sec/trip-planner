@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { AddExpenseDialog } from "@/components/add-expense-dialog"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Plus, DollarSign, Trash2, Calendar, MapPin, ImageIcon } from "lucide-react"
+import { CurrencyConversions } from "@/components/currency-conversions"
 
 interface TripExpense {
   id: string
@@ -202,6 +203,15 @@ export function TripExpenses({ tripId, tripCurrency, canEdit, isOwner }: TripExp
                     {formatCurrency(getTotalByStatus("planned") + getTotalByStatus("purchased"), tripCurrency)}
                   </div>
                   <div className="text-xs text-blue-600">{expenses.length} elementos</div>
+                  {tripCurrency === "USD" && (getTotalByStatus("planned") + getTotalByStatus("purchased")) > 0 && (
+                    <div className="mt-3 pt-3 border-t border-blue-300">
+                      <CurrencyConversions 
+                        usdAmount={getTotalByStatus("planned") + getTotalByStatus("purchased")} 
+                        showTitle={false} 
+                        className="text-blue-700"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="space-y-3">

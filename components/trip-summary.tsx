@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DollarSign } from "lucide-react"
+import { CurrencyConversions } from "@/components/currency-conversions"
 
 // Tipos simplificados para las props
 interface Activity {
@@ -134,6 +135,11 @@ export function TripSummary({ activities, expenses, tripCurrency }: TripSummaryP
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800" data-tutorial="total-cost">
                 <div className="text-sm text-blue-700 dark:text-blue-300">Costo Total Planificado</div>
                 <div className="text-3xl font-bold text-blue-900 dark:text-blue-100">{formatCurrency(totalCost)}</div>
+                {tripCurrency === "USD" && totalCost > 0 && (
+                  <div className="mt-3 pt-3 border-t border-blue-300 dark:border-blue-700">
+                    <CurrencyConversions usdAmount={totalCost} showTitle={false} className="text-blue-700 dark:text-blue-300" />
+                  </div>
+                )}
               </div>
               <div className="space-y-2" data-tutorial="category-breakdown">
                 {chartData.map((item) => (
