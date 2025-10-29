@@ -171,11 +171,7 @@ export default function SummaryPage() {
             (activity: Activity) => !expenseTitles.has(activity.title)
           )
           
-          console.log("📊 Total de actividades:", activitiesData.length)
-          console.log("📊 Actividades sin gastos asociados:", activitiesWithoutExpenses.length)
-          console.log("📊 Gastos divididos/planificados:", expenseTitles.size)
-          console.log("📊 Total de gastos:", expensesData.length)
-          
+         
           setActivities(activitiesWithoutExpenses || [])
         } else {
           setActivities(activitiesData || [])

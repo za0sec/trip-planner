@@ -310,8 +310,27 @@ export default function TripDetailPage() {
   }
 
   const getTotalEstimatedCost = () => {
-    const activitiesCost = activities.reduce((sum, activity) => sum + (activity.estimated_cost || 0), 0)
+    // Identificar qué actividades ya tienen gastos asociados para no contarlas dos veces
+    const expenseTitles = new Set<string>()
+    expenses.forEach((expense) => {
+      if (expense.title) {
+        // Remover sufijos "(Planificación)" o "(Dividido)" para obtener el título original
+        if (expense.title.includes("(Planificación)")) {
+          expenseTitles.add(expense.title.replace(" (Planificación)", ""))
+        } else if (expense.title.includes("(Dividido)")) {
+          expenseTitles.add(expense.title.replace(" (Dividido)", ""))
+        }
+      }
+    })
+    
+    // Solo contar actividades que NO tienen un gasto asociado
+    const activitiesWithoutExpenses = activities.filter(
+      (activity) => !expenseTitles.has(activity.title)
+    )
+    
+    const activitiesCost = activitiesWithoutExpenses.reduce((sum, activity) => sum + (activity.estimated_cost || 0), 0)
     const expensesCost = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+    
     return activitiesCost + expensesCost
   }
 
