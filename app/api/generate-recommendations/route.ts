@@ -35,12 +35,6 @@ interface AIRecommendation {
   estimated_duration?: string
 }
 
-interface DayRecommendations {
-  dayNumber: number
-  date: string
-  recommendations: AIRecommendation[]
-}
-
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -331,7 +325,7 @@ Tienes acceso a un catálogo mental extenso de alternativas para cada tipo de lu
     })
     
     const internalDuplicates = Array.from(titleCounts.entries())
-      .filter(([_, count]) => count > 1)
+      .filter(([, count]) => count > 1)
       .map(([title]) => title)
     
     if (internalDuplicates.length > 0) {
@@ -364,7 +358,7 @@ Tienes acceso a un catálogo mental extenso de alternativas para cada tipo de lu
 
     // Distribute recommendations across days in the segment
     const recsPerDay = Math.ceil(parsedResponse.recommendations.length / segmentLocations.length)
-    const allSavedRecommendations: any[] = []
+    const allSavedRecommendations: AIRecommendation[] = []
 
     for (let i = 0; i < segmentLocations.length; i++) {
       const dayLocation = segmentLocations[i]

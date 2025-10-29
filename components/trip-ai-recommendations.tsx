@@ -638,8 +638,8 @@ export function TripAIRecommendations({
         })
         
         // Agrupar nuevas recomendaciones por trip_location_id
-        const groupedRecs: { [key: string]: any[] } = {}
-        data.recommendations.forEach((rec: any) => {
+        const groupedRecs: { [key: string]: AIRecommendation[] } = {}
+        data.recommendations.forEach((rec: AIRecommendation) => {
           if (!groupedRecs[rec.trip_location_id]) {
             groupedRecs[rec.trip_location_id] = []
           }

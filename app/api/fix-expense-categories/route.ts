@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Procesar cada gasto
     let fixed = 0
-    const updates: Promise<any>[] = []
+    const updates = []
 
     for (const expense of expenses) {
       // Buscar la actividad correspondiente
