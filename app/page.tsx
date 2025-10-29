@@ -22,17 +22,15 @@ export default function HomePage() {
     // Only redirect if we're not loading and we have a user
     // BUT don't redirect if we're in the middle of a password reset
     if (!loading && user) {
-      // Check if this is a password recovery session
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        // Don't redirect if we're in a password reset flow
-        const isPasswordReset = window.location.hash.includes('type=recovery') || 
-                                session?.user?.app_metadata?.provider === 'email'
-        
-        if (!isPasswordReset) {
-          console.log("🏠 Redirecting authenticated user to dashboard")
-          router.push("/dashboard")
-        }
-      })
+      // Check if this is a password recovery session by looking at the URL hash
+      const isPasswordReset = window.location.hash.includes('type=recovery')
+      
+      if (!isPasswordReset) {
+        console.log("🏠 Redirecting authenticated user to dashboard")
+        router.push("/dashboard")
+      } else {
+        console.log("🔐 Password recovery flow detected, not redirecting")
+      }
     }
   }, [user, loading, router])
 
