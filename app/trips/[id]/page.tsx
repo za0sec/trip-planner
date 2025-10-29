@@ -1081,7 +1081,8 @@ export default function TripDetailPage() {
             id: selectedActivityToSplit.id,
             title: selectedActivityToSplit.title,
             description: selectedActivityToSplit.description,
-            estimated_cost: selectedActivityToSplit.estimated_cost
+            estimated_cost: selectedActivityToSplit.estimated_cost,
+            category: selectedActivityToSplit.category
           }}
           tripId={trip.id}
           tripCurrency={trip.currency}

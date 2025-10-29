@@ -27,6 +27,7 @@ interface SplitExistingCostDialogProps {
     title: string
     description: string | null
     estimated_cost: number
+    category?: string | null
   }
   tripId: string
   tripCurrency: string
