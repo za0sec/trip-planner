@@ -26,6 +26,7 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { TutorialSystem } from "@/components/tutorial-system"
+import { DollarRatesArgentina } from "@/components/dollar-rates-argentina"
 // Agregar el import al inicio del archivo
 // import { CreateTestInvitation } from "@/components/create-test-invitation"
 
@@ -326,6 +327,7 @@ export default function DashboardPage() {
       ) : (
         <div className="min-h-screen bg-gray-50 flex flex-col" data-tutorial="welcome">
           <Navbar />
+          <DollarRatesArgentina />
 
         <div className="container mx-auto px-4 py-8 flex-1">
         <div className="flex justify-between items-center mb-8">
