@@ -24,20 +24,31 @@ interface TripSummaryProps {
 
 // Mapeo de categorías para unificar nombres y colores
 const categoryDetails: { [key: string]: { name: string; color: string } } = {
+  // Categorías de actividades (en inglés)
   flight: { name: "Vuelos", color: "#ef4444" },
   accommodation: { name: "Alojamiento", color: "#8b5cf6" },
   transport: { name: "Transporte", color: "#22c55e" },
   food: { name: "Comida", color: "#f97316" },
   activity: { name: "Actividades", color: "#3b82f6" },
   shopping: { name: "Compras", color: "#ec4899" },
-  Entradas: { name: "Entradas", color: "#14b8a6" },
-  Seguros: { name: "Seguros", color: "#6366f1" },
-  Visas: { name: "Visas", color: "#a855f7" },
-  Equipaje: { name: "Equipaje", color: "#d946ef" },
+  other: { name: "Otros", color: "#64748b" },
+  
+  // Categorías de gastos (en español - desde la base de datos)
+  "Vuelos": { name: "Vuelos", color: "#ef4444" },
+  "Alojamiento": { name: "Alojamiento", color: "#8b5cf6" },
+  "Transporte": { name: "Transporte", color: "#22c55e" },
+  "Comida": { name: "Comida", color: "#f97316" },
+  "Actividades": { name: "Actividades", color: "#3b82f6" },
+  "Compras": { name: "Compras", color: "#ec4899" },
+  "Entradas": { name: "Entradas", color: "#14b8a6" },
+  "Seguros": { name: "Seguros", color: "#6366f1" },
+  "Visas": { name: "Visas", color: "#a855f7" },
+  "Equipaje": { name: "Equipaje", color: "#d946ef" },
   "Internet/SIM": { name: "Conectividad", color: "#0ea5e9" },
-  Propinas: { name: "Propinas", color: "#f59e0b" },
-  other: { name: "Otros (Actividad)", color: "#64748b" },
-  "Otro (Gasto)": { name: "Otros (Gasto)", color: "#78716c" },
+  "Propinas": { name: "Propinas", color: "#f59e0b" },
+  "Otro (Gasto)": { name: "Otros", color: "#78716c" },
+  
+  // Fallback
   default: { name: "Sin Categoría", color: "#a1a1aa" },
 }
 

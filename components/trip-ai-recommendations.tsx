@@ -460,18 +460,63 @@ export function TripAIRecommendations({
   const generateAllRecommendations = async () => {
     setIsGeneratingAll(true)
     try {
+      console.log('🎯 Generando recomendaciones para todos los segmentos configurados')
+      
       // Generar recomendaciones solo para segmentos configurados que no las tengan
-      const segmentsToGenerate = segments.filter(segment => 
-        segment.isConfigured && !recommendations[segment.id]
-      )
+      const segmentsToGenerate = segments.filter(segment => {
+        if (!segment.isConfigured) return false
+        
+        // Verificar si el segmento ya tiene recomendaciones
+        const hasRecommendations = segment.tripLocationIds.some(id => 
+          recommendations[id] && recommendations[id].length > 0
+        )
+        
+        return !hasRecommendations
+      })
+      
+      console.log(`📝 ${segmentsToGenerate.length} segmentos por generar de ${segments.length} totales`)
       
       for (const segment of segmentsToGenerate) {
+        console.log(`⏳ Generando segmento ${segment.id}: ${segment.location}`)
         await generateSegmentRecommendations(segment.id)
+        // Pequeña pausa entre segmentos para no sobrecargar la API
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
+      
+      console.log('✅ Todas las recomendaciones generadas')
     } catch (error) {
-      console.error('Error generating all recommendations:', error)
+      console.error('❌ Error generating all recommendations:', error)
     } finally {
       setIsGeneratingAll(false)
+    }
+  }
+  
+  // Función para limpiar recomendaciones de un segmento (para poder regenerar)
+  const clearSegmentRecommendations = async (segmentId: string) => {
+    const segment = segments.find(s => s.id === segmentId)
+    if (!segment) return
+    
+    try {
+      // Eliminar de la base de datos
+      const { error } = await supabase
+        .from('ai_recommendations')
+        .delete()
+        .in('trip_location_id', segment.tripLocationIds)
+      
+      if (error) throw error
+      
+      // Limpiar del estado local
+      setRecommendations(prev => {
+        const newRecs = { ...prev }
+        segment.tripLocationIds.forEach(id => {
+          delete newRecs[id]
+        })
+        return newRecs
+      })
+      
+      console.log('🗑️ Recomendaciones eliminadas para el segmento:', segmentId)
+    } catch (error) {
+      console.error('Error clearing recommendations:', error)
     }
   }
 
@@ -527,19 +572,27 @@ export function TripAIRecommendations({
   }
 
   // Generar recomendaciones para un segmento específico
-  const generateSegmentRecommendations = async (segmentId: string) => {
+  const generateSegmentRecommendations = async (segmentId: string, forceRegenerate: boolean = false) => {
     const segment = segments.find(s => s.id === segmentId)
     if (!segment || !segment.isConfigured) return
 
-    // Evitar duplicados - verificar si ya tiene recomendaciones
+    // Verificar si ya tiene recomendaciones
     const existingRecommendations = segment.tripLocationIds.flatMap(id => 
       recommendations[id] || []
     )
     
-    if (existingRecommendations.length > 0) {
-      console.log(`Segmento ${segmentId} ya tiene ${existingRecommendations.length} recomendaciones, saltando`)
+    if (existingRecommendations.length > 0 && !forceRegenerate) {
+      console.log(`⏭️ Segmento ${segmentId} ya tiene ${existingRecommendations.length} recomendaciones, saltando`)
+      console.log('💡 Tip: Para regenerar, elimina las recomendaciones existentes primero')
       return
     }
+
+    console.log('🚀 Generando recomendaciones para segmento:', {
+      segmentId,
+      location: segment.location,
+      days: `${segment.startDay} - ${segment.endDay}`,
+      forceRegenerate
+    })
 
     setGeneratingRecommendations(prev => {
       const newSet = new Set(prev)
@@ -566,28 +619,58 @@ export function TripAIRecommendations({
         })
       })
 
-      if (!response.ok) throw new Error('Error generando recomendaciones')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.details || 'Error generando recomendaciones')
+      }
 
       const data = await response.json()
       
-      // Actualizar recomendaciones para cada tripLocationId del segmento
+      console.log('✅ Recomendaciones recibidas:', data.stats)
+      
+      // Limpiar recomendaciones viejas del estado local para este segmento
       setRecommendations(prev => {
         const newRecommendations = { ...prev }
-        // Distribuir las recomendaciones entre todos los tripLocationIds del segmento
+        
+        // Limpiar recomendaciones antiguas
         segment.tripLocationIds.forEach(locationId => {
-          newRecommendations[locationId] = data.recommendations || []
+          delete newRecommendations[locationId]
         })
+        
+        // Agrupar nuevas recomendaciones por trip_location_id
+        const groupedRecs: { [key: string]: any[] } = {}
+        data.recommendations.forEach((rec: any) => {
+          if (!groupedRecs[rec.trip_location_id]) {
+            groupedRecs[rec.trip_location_id] = []
+          }
+          groupedRecs[rec.trip_location_id].push(rec)
+        })
+        
+        // Asignar las nuevas recomendaciones
+        Object.keys(groupedRecs).forEach(locationId => {
+          newRecommendations[locationId] = groupedRecs[locationId]
+        })
+        
         return newRecommendations
       })
 
-      if (data.seasonalNote) {
+      if (data.seasonal_note) {
         setSeasonalNotes(prev => ({
           ...prev,
-          [segmentId]: data.seasonalNote
+          [segmentId]: data.seasonal_note
         }))
       }
+      
+      // Auto-expandir el segmento para ver los resultados
+      setExpandedSegments(prev => {
+        const newSet = new Set(prev)
+        newSet.add(segmentId)
+        return newSet
+      })
+      
     } catch (error) {
-      console.error('Error:', error)
+      console.error('❌ Error generando recomendaciones:', error)
+      alert(`Error: ${error instanceof Error ? error.message : 'No se pudieron generar recomendaciones'}`)
     } finally {
       setGeneratingRecommendations(prev => {
         const newSet = new Set(prev)
@@ -856,6 +939,7 @@ export function TripAIRecommendations({
                                   onClick={() => generateSegmentRecommendations(segment.id)}
                                   disabled={isGenerating}
                                   className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                  title="Generar recomendaciones IA"
                                 >
                                   {isGenerating ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -863,6 +947,41 @@ export function TripAIRecommendations({
                                     <Sparkles className="h-4 w-4" />
                                   )}
                                 </Button>
+                              )}
+                              
+                              {segment.isConfigured && hasRecommendations && canEdit && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={async () => {
+                                      await clearSegmentRecommendations(segment.id)
+                                      await generateSegmentRecommendations(segment.id, true)
+                                    }}
+                                    disabled={isGenerating}
+                                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                    title="Regenerar recomendaciones"
+                                  >
+                                    {isGenerating ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <Sparkles className="h-4 w-4 mr-1" />
+                                        Regenerar
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => clearSegmentRecommendations(segment.id)}
+                                    disabled={isGenerating}
+                                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                    title="Limpiar recomendaciones"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
                               )}
                               
                               {canEdit && (

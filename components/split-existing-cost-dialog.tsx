@@ -333,9 +333,37 @@ export function SplitExistingCostDialog({
         throw new Error(`Ya existe un gasto dividido para "${activity.title}". No se pueden crear duplicados.`)
       }
 
+      // Mapear categoría de actividad a categoría de gasto
+      const activityToCategoryMap: { [key: string]: string } = {
+        flight: 'Vuelos',
+        accommodation: 'Alojamiento',
+        transport: 'Transporte',
+        food: 'Comida',
+        activity: 'Actividades',
+        shopping: 'Compras',
+        other: 'Otros'
+      }
+      
+      const categoryName = activity.category ? activityToCategoryMap[activity.category] : null
+      
+      // Buscar el category_id correspondiente
+      let categoryId = null
+      if (categoryName) {
+        const { data: categoryData } = await supabase
+          .from('categories')
+          .select('id')
+          .eq('name', categoryName)
+          .single()
+        
+        if (categoryData) {
+          categoryId = categoryData.id
+        }
+      }
+      
       // Si no hay error o no existe, proceder a crear el gasto dividido
       const { data: expenseData, error: expenseError } = await supabase.from("trip_expenses").insert({
         trip_id: tripId,
+        category_id: categoryId,
         title: expectedTitle, // Usar sufijo consistente
         description: `Costo dividido de: ${activity.description || activity.title}`,
         amount: activity.estimated_cost,

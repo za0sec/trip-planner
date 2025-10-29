@@ -69,10 +69,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return
 
       console.log("🔄 Auth state changed:", event, session?.user?.email || "no user")
+      
+      // Handle password recovery differently - don't create profile yet
+      if (event === "PASSWORD_RECOVERY") {
+        console.log("🔐 Password recovery detected, redirecting to reset password page")
+        setUser(session?.user ?? null)
+        setLoading(false)
+        // Redirect to reset password page
+        if (typeof window !== "undefined") {
+          window.location.href = "/auth/reset-password"
+        }
+        return
+      }
+
       setUser(session?.user ?? null)
       setLoading(false)
 
-      // Create profile in background when user signs in
+      // Create profile in background when user signs in (but not for password recovery)
       if (session?.user && event === "SIGNED_IN") {
         createProfileInBackground(session.user)
       }

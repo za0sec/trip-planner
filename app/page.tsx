@@ -9,6 +9,7 @@ import { useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CheckCircle, AlertCircle } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 export default function HomePage() {
   const { user, loading } = useAuth()
@@ -19,9 +20,19 @@ export default function HomePage() {
 
   useEffect(() => {
     // Only redirect if we're not loading and we have a user
+    // BUT don't redirect if we're in the middle of a password reset
     if (!loading && user) {
-      console.log("🏠 Redirecting authenticated user to dashboard")
-      router.push("/dashboard")
+      // Check if this is a password recovery session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        // Don't redirect if we're in a password reset flow
+        const isPasswordReset = window.location.hash.includes('type=recovery') || 
+                                session?.user?.app_metadata?.provider === 'email'
+        
+        if (!isPasswordReset) {
+          console.log("🏠 Redirecting authenticated user to dashboard")
+          router.push("/dashboard")
+        }
+      })
     }
   }, [user, loading, router])
 

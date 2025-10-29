@@ -458,9 +458,37 @@ export function AddItemDialog({ open, onOpenChange, tripId, tripCurrency, tripSt
 
       // Si hay costo y se debe dividir, crear un gasto dividido
       if (shouldSplit && formData.estimatedCost && parseFloat(formData.estimatedCost) > 0) {
+        // Mapear categoría de actividad a categoría de gasto
+        const activityToCategoryMap: { [key: string]: string } = {
+          flight: 'Vuelos',
+          accommodation: 'Alojamiento',
+          transport: 'Transporte',
+          food: 'Comida',
+          activity: 'Actividades',
+          shopping: 'Compras',
+          other: 'Otros'
+        }
+        
+        const categoryName = activityToCategoryMap[formData.category]
+        
+        // Buscar el category_id correspondiente
+        let categoryId = null
+        if (categoryName) {
+          const { data: categoryData } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('name', categoryName)
+            .single()
+          
+          if (categoryData) {
+            categoryId = categoryData.id
+          }
+        }
+        
         // Crear el gasto dividido en trip_expenses
         const { data: expenseData, error: expenseError } = await supabase.from("trip_expenses").insert({
           trip_id: tripId,
+          category_id: categoryId,
           title: `${formData.title} (Planificación)`,
           description: `Costo estimado para: ${formData.description || formData.title}`,
           amount: Number.parseFloat(formData.estimatedCost),

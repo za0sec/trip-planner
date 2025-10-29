@@ -961,6 +961,15 @@ export default function TripDetailPage() {
                       .map((date, index) => {
                         const dayActivities = activitiesByDate[date]
                         const dayTotal = dayActivities.reduce((sum, act) => sum + (act.estimated_cost || 0), 0)
+                        
+                        // Calcular el número de día real basado en la fecha de inicio del viaje
+                        let dayNumber = index + 1 // Default al índice si no hay fecha de inicio
+                        if (trip.start_date) {
+                          const tripStartDate = new Date(trip.start_date)
+                          const currentDate = new Date(date)
+                          dayNumber = Math.floor((currentDate.getTime() - tripStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+                        }
+                        
                         return (
                           <div
                             key={date}
@@ -968,7 +977,7 @@ export default function TripDetailPage() {
                           >
                             <div className="flex items-center justify-between mb-4">
                               <div>
-                                <h3 className="text-xl font-bold">Día {index + 1}</h3>
+                                <h3 className="text-xl font-bold">Día {dayNumber}</h3>
                                 <p className="text-gray-600 dark:text-gray-400">{formatDate(date)}</p>
                               </div>
                               {dayTotal > 0 && (

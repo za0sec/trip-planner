@@ -15,7 +15,8 @@ import {
   PieChart,
   MapPin,
   Calendar,
-  Loader2
+  Loader2,
+  Wrench
 } from "lucide-react"
 import Link from "next/link"
 
@@ -85,9 +86,11 @@ export default function SummaryPage() {
   const [expenses, setExpenses] = useState<TripExpense[]>([])
   const [userRole, setUserRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fixingCategories, setFixingCategories] = useState(false)
 
   const isOwner = () => trip?.created_by === user?.id
   const canView = () => isOwner() || userRole?.status === "accepted"
+  const canEdit = () => isOwner() || (userRole?.role === "editor" && userRole?.status === "accepted")
 
   useEffect(() => {
     if (user && params.id) {
@@ -188,6 +191,34 @@ export default function SummaryPage() {
     }
   }
 
+  const fixExpenseCategories = async () => {
+    if (!trip) return
+    
+    setFixingCategories(true)
+    try {
+      const response = await fetch('/api/fix-expense-categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tripId: trip.id })
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        alert(`✅ Se arreglaron ${data.fixed} gasto${data.fixed !== 1 ? 's' : ''}`)
+        // Recargar datos
+        fetchTripData()
+      } else {
+        alert(`Error: ${data.error}`)
+      }
+    } catch (error) {
+      console.error('Error fixing categories:', error)
+      alert('Error al arreglar las categorías')
+    } finally {
+      setFixingCategories(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
@@ -265,6 +296,27 @@ export default function SummaryPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {canEdit() && expenses.some(e => e.category_name === null) && (
+                <Button
+                  onClick={fixExpenseCategories}
+                  disabled={fixingCategories}
+                  variant="outline"
+                  size="sm"
+                  className="text-purple-600 hover:text-purple-700"
+                >
+                  {fixingCategories ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      Arreglando...
+                    </>
+                  ) : (
+                    <>
+                      <Wrench className="h-4 w-4 mr-1" />
+                      Arreglar Categorías
+                    </>
+                  )}
+                </Button>
+              )}
               {trip.start_date && (
                 <Badge variant="outline" className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
