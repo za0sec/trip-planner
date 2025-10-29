@@ -132,10 +132,6 @@ export default function SummaryPage() {
 
       if (activitiesError) {
         console.error("Error fetching activities:", activitiesError)
-        setActivities([])
-      } else {
-        console.log("Activities data:", activitiesData)
-        setActivities(activitiesData || [])
       }
 
       // Fetch expenses using the same RPC function as the expenses component
@@ -147,8 +143,44 @@ export default function SummaryPage() {
       if (expensesError) {
         console.error("Error fetching expenses:", expensesError)
         setExpenses([])
+        setActivities(activitiesData || [])
       } else {
         console.log("Expenses data from RPC:", expensesData)
+        
+        // Filtrar las actividades que ya tienen gastos asociados
+        // para evitar duplicar el conteo en el resumen
+        if (expensesData && activitiesData) {
+          const expenseTitles = new Set<string>()
+          
+          expensesData.forEach((expense: TripExpense) => {
+            if (expense.title) {
+              // Remover sufijos "(Planificación)" o "(Dividido)" para obtener el título original
+              let originalTitle = expense.title
+              if (expense.title.includes("(Planificación)")) {
+                originalTitle = expense.title.replace(" (Planificación)", "")
+                expenseTitles.add(originalTitle)
+              } else if (expense.title.includes("(Dividido)")) {
+                originalTitle = expense.title.replace(" (Dividido)", "")
+                expenseTitles.add(originalTitle)
+              }
+            }
+          })
+          
+          // Filtrar actividades que no tienen un gasto asociado
+          const activitiesWithoutExpenses = activitiesData.filter(
+            (activity: Activity) => !expenseTitles.has(activity.title)
+          )
+          
+          console.log("📊 Total de actividades:", activitiesData.length)
+          console.log("📊 Actividades sin gastos asociados:", activitiesWithoutExpenses.length)
+          console.log("📊 Gastos divididos/planificados:", expenseTitles.size)
+          console.log("📊 Total de gastos:", expensesData.length)
+          
+          setActivities(activitiesWithoutExpenses || [])
+        } else {
+          setActivities(activitiesData || [])
+        }
+        
         setExpenses(expensesData || [])
       }
 
