@@ -40,6 +40,7 @@ import { AddItemDialog } from "@/components/add-item-dialog"
 import { SplitExistingCostDialog } from "@/components/split-existing-cost-dialog"
 import { TutorialSystem } from "@/components/tutorial-system"
 import { CurrencyConversions } from "@/components/currency-conversions"
+import { CurrencyInline } from "@/components/currency-inline"
 
 interface Trip {
   id: string
@@ -681,6 +682,11 @@ export default function TripDetailPage() {
                                 </CollapsibleTrigger>
                                 <CollapsibleContent className="px-3 pt-2 pb-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-lg">
                                   <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                                    {activity.estimated_cost && trip.currency === "USD" && (
+                                      <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-600">
+                                        <CurrencyConversions usdAmount={activity.estimated_cost} showTitle={false} />
+                                      </div>
+                                    )}
                                     {activity.description && (
                                       <p>
                                         <strong className="font-medium text-gray-600 dark:text-gray-400">
@@ -838,6 +844,11 @@ export default function TripDetailPage() {
                                         </CollapsibleTrigger>
                                         <CollapsibleContent className="px-3 pt-2 pb-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-lg">
                                           <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                                            {activity.estimated_cost && trip.currency === "USD" && (
+                                              <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-600">
+                                                <CurrencyConversions usdAmount={activity.estimated_cost} showTitle={false} />
+                                              </div>
+                                            )}
                                             {activity.description && (
                                               <p>
                                                 <strong className="font-medium text-gray-600 dark:text-gray-400">
@@ -990,6 +1001,11 @@ export default function TripDetailPage() {
                                 <div className="text-right">
                                   <div className="text-lg font-semibold">{formatCurrency(dayTotal, trip.currency)}</div>
                                   <div className="text-sm text-gray-600 dark:text-gray-400">Costo del día</div>
+                                  {trip.currency === "USD" && (
+                                    <div className="mt-2 p-2 bg-white/50 dark:bg-gray-800/50 rounded border border-gray-300 dark:border-gray-600 text-xs">
+                                      <CurrencyConversions usdAmount={dayTotal} showTitle={false} />
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1021,8 +1037,13 @@ export default function TripDetailPage() {
                                           </p>
                                         </div>
                                         {activity.estimated_cost && (
-                                          <div className="text-sm font-medium">
-                                            {formatCurrency(activity.estimated_cost, trip.currency)}
+                                          <div className="text-right">
+                                            <div className="text-sm font-medium">
+                                              {formatCurrency(activity.estimated_cost, trip.currency)}
+                                            </div>
+                                            {trip.currency === "USD" && (
+                                              <CurrencyInline usdAmount={activity.estimated_cost} />
+                                            )}
                                           </div>
                                         )}
                                       </div>

@@ -10,6 +10,7 @@ import { AddExpenseDialog } from "@/components/add-expense-dialog"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Plus, DollarSign, Trash2, Calendar, MapPin, ImageIcon } from "lucide-react"
 import { CurrencyConversions } from "@/components/currency-conversions"
+import { CurrencyInline } from "@/components/currency-inline"
 
 interface TripExpense {
   id: string
@@ -278,7 +279,10 @@ export function TripExpenses({ tripId, tripCurrency, canEdit, isOwner }: TripExp
                         <div className="flex items-center gap-3">
                           <div className="text-right">
                             <div className="text-xl font-bold">{formatCurrency(expense.amount, tripCurrency)}</div>
-                            <div className="text-xs text-gray-500">
+                            {tripCurrency === "USD" && (
+                              <CurrencyInline usdAmount={expense.amount} />
+                            )}
+                            <div className="text-xs text-gray-500 mt-1">
                               {new Date(expense.created_at).toLocaleDateString("es-AR")}
                             </div>
                           </div>
